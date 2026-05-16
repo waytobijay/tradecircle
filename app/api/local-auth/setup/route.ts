@@ -133,7 +133,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       res.cookies.set('tc-admin',   userRecord.uid, cookieOpts());
       return res;
     } catch (err) {
-      const e = err as { code?: string; message?: string };
+      const e = err as { code?: string | number; message?: string };
+      const msg = String(e.message ?? '');
+
       if (e.code === 'auth/email-already-exists') {
         return NextResponse.json(
           {
@@ -141,17 +143,62 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             error: 'email_in_use',
             message:
               'This email already exists in Firebase Auth. Use a different email, ' +
-              'or delete the existing user in Firebase Console.',
+              'or delete the existing user in Firebase Console → Authentication.',
           },
           { status: 409 },
         );
       }
+
+      // gRPC code 5 = NOT_FOUND — Firestore database doesn't exist yet
+      if (e.code === 5 || msg.includes('NOT_FOUND') || msg.includes('does not exist')) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: 'firestore_not_initialised',
+            message:
+              'Firestore database does not exist for this project. ' +
+              'Open Firebase Console → Firestore Database → Create database, ' +
+              'pick a region (australia-southeast1 recommended), choose Production mode, then retry.',
+          },
+          { status: 503 },
+        );
+      }
+
+      // Auth not enabled — Firebase Auth REST returns this when Email/Password is off
+      if (msg.includes('CONFIGURATION_NOT_FOUND') || msg.includes('auth/operation-not-allowed')) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: 'auth_not_enabled',
+            message:
+              'Email/Password sign-in is not enabled. ' +
+              'Open Firebase Console → Authentication → Sign-in method → Email/Password → Enable.',
+          },
+          { status: 503 },
+        );
+      }
+
+      // Permission denied — service account lacks Firestore access
+      if (e.code === 7 || msg.includes('PERMISSION_DENIED')) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: 'permission_denied',
+            message:
+              'Service account lacks permission. ' +
+              'Verify FIREBASE_SERVICE_ACCOUNT_JSON belongs to project tradecircle-ceda8 ' +
+              'and the service account has Firestore + Auth admin roles.',
+          },
+          { status: 403 },
+        );
+      }
+
       console.error('[setup] firebase admin error:', e);
       return NextResponse.json(
         {
           ok: false,
           error: 'firebase_error',
-          message: e.message ?? 'Failed to create admin in Firebase.',
+          message: msg || 'Failed to create admin in Firebase.',
         },
         { status: 500 },
       );
