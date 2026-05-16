@@ -1,0 +1,222 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────
+    // Helper functions
+    // ─────────────────────────────────────────
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isSeller() {
+      return isAuth() && getUserRole() == 'seller';
+    }
+
+    function isAdvisor() {
+      return isAuth() && getUserRole() == 'advisor';
+    }
+
+    function isAdminUser() {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid));
+    }
+
+    // ─────────────────────────────────────────
+    // users/{uid}
+    // Read:   any authenticated user
+    // Write:  own document or admin
+    // ─────────────────────────────────────────
+
+    match /users/{uid} {
+      allow read: if isAuth();
+      allow create: if isAuth() && isOwner(uid);
+      allow update: if isAuth() && (isOwner(uid) || isAdminUser());
+      allow delete: if isAdminUser();
+    }
+
+    // ─────────────────────────────────────────
+    // products/{productId}
+    // Read:   anyone (public browsing)
+    // Create: authenticated sellers only
+    // Update/Delete: seller who owns the product or admin
+    // ─────────────────────────────────────────
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isSeller();
+      allow update: if isAuth() &&
+        (resource.data.sellerId == request.auth.uid || isAdminUser());
+      allow delete: if isAuth() &&
+        (resource.data.sellerId == request.auth.uid || isAdminUser());
+    }
+
+    // ─────────────────────────────────────────
+    // orders/{orderId}
+    // Read:   buyer, seller involved in the order, or admin
+    // Create: authenticated users (buyers)
+    // Update: seller (status change) or admin
+    // Delete: admin only
+    // ─────────────────────────────────────────
+
+    match /orders/{orderId} {
+      allow read: if isAuth() && (
+        resource.data.buyerId  == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        isAdminUser()
+      );
+      allow create: if isAuth();
+      allow update: if isAuth() && (
+        resource.data.sellerId == request.auth.uid ||
+        isAdminUser()
+      );
+      allow delete: if isAdminUser();
+    }
+
+    // ─────────────────────────────────────────
+    // messages/{conversationId}
+    // Read/Write: only participants in the conversation
+    // ─────────────────────────────────────────
+
+    match /messages/{conversationId} {
+      allow read, write: if isAuth() &&
+        request.auth.uid in resource.data.participants;
+
+      // Allow creating a new conversation where the caller is a participant
+      allow create: if isAuth() &&
+        request.auth.uid in request.resource.data.participants;
+
+      // Sub-collection: messages/{conversationId}/items/{messageId}
+      match /items/{messageId} {
+        allow read, write: if isAuth() &&
+          request.auth.uid in
+            get(/databases/$(database)/documents/messages/$(conversationId)).data.participants;
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // advicePosts/{postId}
+    // Read:   anyone if published==true; owner advisor if draft
+    // Create: advisors only
+    // Update/Delete: owner advisor or admin
+    // ─────────────────────────────────────────
+
+    match /advicePosts/{postId} {
+      allow read: if resource.data.published == true ||
+        (isAuth() && resource.data.advisorId == request.auth.uid) ||
+        isAdminUser();
+      allow create: if isAdvisor();
+      allow update: if isAuth() && (
+        resource.data.advisorId == request.auth.uid ||
+        isAdminUser()
+      );
+      allow delete: if isAuth() && (
+        resource.data.advisorId == request.auth.uid ||
+        isAdminUser()
+      );
+    }
+
+    // ─────────────────────────────────────────
+    // advisorEnquiries/{enquiryId}
+    // Read:   fromUserId, toAdvisorId, or admin
+    // Create: any authenticated user
+    // Update: toAdvisorId (mark responded) or admin
+    // Delete: admin only
+    // ─────────────────────────────────────────
+
+    match /advisorEnquiries/{enquiryId} {
+      allow read: if isAuth() && (
+        resource.data.fromUserId   == request.auth.uid ||
+        resource.data.toAdvisorId  == request.auth.uid ||
+        isAdminUser()
+      );
+      allow create: if isAuth();
+      allow update: if isAuth() && (
+        resource.data.toAdvisorId == request.auth.uid ||
+        isAdminUser()
+      );
+      allow delete: if isAdminUser();
+    }
+
+    // ─────────────────────────────────────────
+    // notifications/{uid}/items/{notificationId}
+    // Read/Write: only the owner (uid)
+    // ─────────────────────────────────────────
+
+    match /notifications/{uid}/items/{notificationId} {
+      allow read, write: if isAuth() && isOwner(uid);
+    }
+
+    // ─────────────────────────────────────────
+    // config/{docId}
+    // Read:  anyone (theme, currency, etc. needed publicly)
+    // Write: admin only
+    // ─────────────────────────────────────────
+
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isAdminUser();
+    }
+
+    // ─────────────────────────────────────────
+    // adminUsers/{adminUserId}
+    // Read/Write: admin only
+    // ─────────────────────────────────────────
+
+    match /adminUsers/{adminUserId} {
+      allow read, write: if isAdminUser();
+    }
+
+    // ─────────────────────────────────────────
+    // ads/{adId}
+    // Read:  anyone
+    // Write: admin only
+    // ─────────────────────────────────────────
+
+    match /ads/{adId} {
+      allow read: if true;
+      allow write: if isAdminUser();
+    }
+
+    // ─────────────────────────────────────────
+    // reviews/{reviewId}
+    // Read:   anyone
+    // Create: authenticated users (buyers who have placed an order)
+    // Update/Delete: admin only
+    // ─────────────────────────────────────────
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuth();
+      allow update, delete: if isAdminUser();
+    }
+
+    // ─────────────────────────────────────────
+    // backups/{backupId}
+    // Read/Write: admin only
+    // ─────────────────────────────────────────
+
+    match /backups/{backupId} {
+      allow read, write: if isAdminUser();
+    }
+
+    // ─────────────────────────────────────────
+    // adminLogs/{logId}
+    // Read/Write: admin only
+    // ─────────────────────────────────────────
+
+    match /adminLogs/{logId} {
+      allow read, write: if isAdminUser();
+    }
+
+  }
+}
