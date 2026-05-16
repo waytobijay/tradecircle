@@ -6,14 +6,42 @@
  * Responsibilities:
  *   - Sets <html> lang + suppressHydrationWarning (uiStore writes data-theme before hydration)
  *   - Metadata (title template, description, viewport)
- *   - Fonts are loaded via @import in globals.css (Sora / DM Sans / JetBrains Mono)
+ *   - Fonts loaded via next/font/google (self-hosted, preloaded, no render-blocking CSS)
  *   - AuthProvider bootstraps onAuthStateChanged once at the app root
  *   - No layout chrome here — each role layout (Buyer/Seller/Advisor/Admin/Public) handles its own shell
  */
 
 import type { Metadata, Viewport } from 'next';
+import { Sora, DM_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+
+// ─────────────────────────────────────────────
+// Fonts — self-hosted via next/font (no external CSS request)
+// CSS variables fall through to the --font-heading / --font-body / --font-mono
+// tokens declared in globals.css so existing rules keep working.
+// ─────────────────────────────────────────────
+
+const sora = Sora({
+  subsets:  ['latin'],
+  weight:   ['500', '600', '700'],
+  variable: '--font-heading',
+  display:  'swap',
+});
+
+const dmSans = DM_Sans({
+  subsets:  ['latin'],
+  weight:   ['400', '500'],
+  variable: '--font-body',
+  display:  'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets:  ['latin'],
+  weight:   ['400'],
+  variable: '--font-mono',
+  display:  'swap',
+});
 
 // ─────────────────────────────────────────────
 // Metadata
@@ -36,15 +64,15 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-/**
- * Force dynamic rendering for all routes.
- * Reason: The app is fully Firebase-backed client-side (Auth + Firestore
- * onSnapshot listeners). Static pre-rendering at build time tries to evaluate
- * client modules and fails because the Firebase SDK requires window/browser
- * APIs. Forcing dynamic = 'force-dynamic' here makes Vercel render every route
- * on demand, which is the correct mode for a real-time data app.
+/*
+ * NOTE: `export const dynamic = 'force-dynamic'` was previously declared here.
+ * It has been removed so static pages (about, privacy, terms, contact, faq,
+ * cookies) can be statically optimised. Pages that genuinely require dynamic
+ * rendering should declare `dynamic = 'force-dynamic'` themselves (server
+ * pages only — client `'use client'` files cannot export route segment config
+ * and instead should be wrapped in a server page that uses next/dynamic with
+ * ssr: false if pre-render fails).
  */
-export const dynamic = 'force-dynamic';
 
 // ─────────────────────────────────────────────
 // Root layout
@@ -59,7 +87,11 @@ export default function RootLayout({
      * synchronously during client init, which would cause a hydration mismatch
      * without this flag. Safe to suppress — the only diff is data-theme.
      */
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${sora.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
+    >
       <body>
         <AuthProvider>
           {children}

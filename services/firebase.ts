@@ -3,18 +3,30 @@
  * Initialises Firebase and exports shared service instances.
  * Spec ref: section 9.1 (Firebase as primary backend)
  *
+ * Bootstrap-friendly behaviour:
+ *   - If `NEXT_PUBLIC_FIREBASE_API_KEY` is present we initialise normally.
+ *   - Otherwise we DO NOT initialise — `db`, `auth`, and `storage` are all
+ *     `null`. Callers must handle the unconfigured case gracefully. The
+ *     `/setup` page and `/admin/firebase-setup` wizard both work without
+ *     Firebase being live.
+ *
+ * NOTE: This module is shared between client and server. Direct reads from
+ * the local-config file happen only via API routes — we never touch `fs`
+ * from this module since it'd break the client bundle.
+ *
  * Usage:
- *   import { db, auth, storage } from '@/services/firebase'
+ *   import { db, auth, storage, isFirebaseConfigured } from '@/services/firebase'
+ *   if (!db) { ... handle no-op ... }
  */
 
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getFirestore, Firestore } from 'firebase/firestore';
-import { getAuth, Auth } from 'firebase/auth';
-import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getFirestore, Firestore }                     from 'firebase/firestore';
+import { getAuth, Auth }                               from 'firebase/auth';
+import { getStorage, FirebaseStorage }                 from 'firebase/storage';
 
 // ─────────────────────────────────────────────
-// Config — all values from environment variables
-// Never hardcode keys here. Spec ref: section 9.7
+// Config — env vars only on this module path.
+// (Local-config values are pulled into env at deploy time by the wizard.)
 // ─────────────────────────────────────────────
 const firebaseConfig = {
   apiKey:        process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -24,49 +36,49 @@ const firebaseConfig = {
   appId:         process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 } as const;
 
-// ─────────────────────────────────────────────
-// Validate required env vars at startup
-// Surfaces missing config clearly in development
-// ─────────────────────────────────────────────
-const requiredVars: Array<keyof typeof firebaseConfig> = [
-  'apiKey',
-  'projectId',
-  'authDomain',
-  'storageBucket',
-  'appId',
-];
+export const isFirebaseConfigured: boolean =
+  !!firebaseConfig.apiKey && !!firebaseConfig.projectId && !!firebaseConfig.appId;
 
-if (typeof window !== 'undefined' || process.env.NODE_ENV === 'development') {
-  requiredVars.forEach((key) => {
-    if (!firebaseConfig[key]) {
-      console.warn(
-        `[TradeCircle] Missing Firebase env var: NEXT_PUBLIC_FIREBASE_${key
-          .replace(/([A-Z])/g, '_$1')
-          .toUpperCase()}`
-      );
-    }
-  });
+// ─────────────────────────────────────────────
+// Initialisation — no-op when env is missing.
+// ─────────────────────────────────────────────
+
+let _app:     FirebaseApp      | null = null;
+let _db:      Firestore        | null = null;
+let _auth:    Auth             | null = null;
+let _storage: FirebaseStorage  | null = null;
+
+if (isFirebaseConfigured) {
+  try {
+    _app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    _db      = getFirestore(_app);
+    _auth    = getAuth(_app);
+    _storage = getStorage(_app);
+  } catch (err) {
+    console.error('[TradeCircle] Firebase init failed:', err);
+  }
+} else if (typeof window !== 'undefined' || process.env.NODE_ENV === 'development') {
+  // One clear, actionable warning — not a wall of per-key warnings.
+  console.warn(
+    '[TradeCircle] Firebase not configured — visit /admin/firebase-setup to ' +
+    'connect your Firebase project. Running in local-bootstrap mode.',
+  );
 }
 
 // ─────────────────────────────────────────────
-// Initialisation — guarded against double-init
-// Next.js hot-reload can call this module twice;
-// getApps() check prevents "already initialised" error.
-// ─────────────────────────────────────────────
-const app: FirebaseApp =
-  getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-
-// ─────────────────────────────────────────────
-// Service exports
+// Exports
 // ─────────────────────────────────────────────
 
-/** Firestore database instance — all collection reads/writes go through this */
-const db: Firestore = getFirestore(app);
-
-/** Firebase Auth instance — email/password + Google OAuth */
-const auth: Auth = getAuth(app);
-
-/** Firebase Storage instance — used for backup files and fallback media */
-const storage: FirebaseStorage = getStorage(app);
-
-export { app, db, auth, storage };
+/**
+ * NOTE on `null`:
+ *   The `as Firestore` / `as Auth` casts below preserve type-compatibility
+ *   for the bulk of the codebase, but at runtime these are `null` when
+ *   Firebase isn't configured. New code should prefer
+ *   `isFirebaseConfigured` + null-checks. Existing imports that assume
+ *   non-null will throw, which is correct — those paths shouldn't be hit
+ *   in bootstrap mode.
+ */
+export const app     = _app     as unknown as FirebaseApp;
+export const db      = _db      as unknown as Firestore;
+export const auth    = _auth    as unknown as Auth;
+export const storage = _storage as unknown as FirebaseStorage;

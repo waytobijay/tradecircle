@@ -105,6 +105,12 @@ export function middleware(request: NextRequest): NextResponse {
 
   // ── 2. Admin routes (/admin/*) ─────────────
   // Requires both a valid session AND admin cookie.
+  // The admin cookie may be either:
+  //   - a Firebase UID (set by /api/session after Firebase login), or
+  //   - the literal string 'local-bootstrap' (set by /api/local-auth
+  //     before Firebase is configured).
+  // Both grant access; the page-level code is responsible for any
+  // Firebase-vs-local conditional behaviour.
   // Spec ref: section 6.7 (Admin Portal — admin/super-admin only)
   if (pathname.startsWith(ADMIN_PREFIX)) {
     if (!sessionCookie) {
@@ -139,9 +145,11 @@ export const config = {
      *   - _next/static  (static chunks)
      *   - _next/image   (image optimisation)
      *   - favicon.ico
-     *   - public folder files (png, jpg, svg, etc.)
+     *   - icons/, images/, fonts/ public folders
+     *   - public folder files (png, jpg, svg, css, js, woff2, etc.)
      *   - /api routes (handled by their own auth)
+     *   - /api/setup-check (bootstrap probe — must never be blocked)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icons/|images/|fonts/|api/|.*\\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico|css|js|map|woff|woff2|ttf|otf)$).*)',
   ],
 };

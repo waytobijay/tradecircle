@@ -1,52 +1,40 @@
 /**
  * app/api/setup-check/route.ts
- * Reports whether the first-time admin setup has been completed.
+ * Reports whether the first-time admin setup has been completed AND whether
+ * Firebase is configured.
  *
- * GET → { setupComplete: boolean, configured: boolean }
- *   - configured=false means the Firebase Admin SDK env vars are missing,
- *     so we cannot answer authoritatively. The setup page should still load
- *     in that case (allow the user to bootstrap from the client).
+ * GET → {
+ *   setupComplete:       boolean,   // local bootstrap admin exists
+ *   firebaseConfigured:  boolean,   // NEXT_PUBLIC_FIREBASE_API_KEY exists OR
+ *                                   // local config has firebase.apiKey
+ *   configured:          boolean,   // legacy alias for setupComplete callers
+ * }
  *
- * Cached for 60s via `Cache-Control` to reduce Firestore reads while the
- * platform is being warmed up.
+ * Never cached — the login page polls this on mount to choose between the
+ * Firebase and local-bootstrap auth paths.
  */
 
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/services/firebase-admin';
+import { readLocalConfig } from '@/lib/localConfig';
 
 export async function GET(): Promise<NextResponse> {
-  const db = adminDb();
-  if (!db) {
-    return NextResponse.json(
-      { setupComplete: false, configured: false },
-      {
-        status: 200,
-        headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' },
-      },
-    );
-  }
+  const cfg = await readLocalConfig();
 
-  try {
-    const snap = await db
-      .collection('adminUsers')
-      .where('role', '==', 'super-admin')
-      .limit(1)
-      .get();
+  const envHasFirebase = !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const localHasFirebase = !!cfg?.firebase?.apiKey;
 
-    const setupComplete = !snap.empty;
+  const setupComplete      = !!cfg?.admin;
+  const firebaseConfigured = envHasFirebase || localHasFirebase;
 
-    return NextResponse.json(
-      { setupComplete, configured: true },
-      {
-        status: 200,
-        headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' },
-      },
-    );
-  } catch (err) {
-    console.error('[/api/setup-check] Failed to query adminUsers:', err);
-    return NextResponse.json(
-      { setupComplete: false, configured: true, error: 'query_failed' },
-      { status: 500 },
-    );
-  }
+  return NextResponse.json(
+    {
+      setupComplete,
+      firebaseConfigured,
+      configured: setupComplete, // back-compat for older callers
+    },
+    {
+      status:  200,
+      headers: { 'Cache-Control': 'no-store' },
+    },
+  );
 }

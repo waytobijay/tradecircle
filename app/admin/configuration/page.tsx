@@ -286,6 +286,34 @@ export default function ConfigurationPage() {
 
   async function testConnection(key: string) {
     setTestStatus((p) => ({ ...p, [key]: 'testing' }));
+
+    // Real test for Cloudinary: upload a 1x1 PNG via the configured cloudName + uploadPreset
+    if (key === 'cloudinary') {
+      const { cloudName, uploadPreset } = config.cloudinary;
+      if (!cloudName || !uploadPreset) {
+        setTestStatus((p) => ({ ...p, [key]: 'fail' }));
+        setTimeout(() => setTestStatus((p) => ({ ...p, [key]: 'idle' })), 3000);
+        return;
+      }
+      try {
+        // 1x1 transparent PNG
+        const png =
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+        const fd = new FormData();
+        fd.append('file', `data:image/png;base64,${png}`);
+        fd.append('upload_preset', uploadPreset);
+        const res = await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+          { method: 'POST', body: fd },
+        );
+        setTestStatus((p) => ({ ...p, [key]: res.ok ? 'ok' : 'fail' }));
+      } catch {
+        setTestStatus((p) => ({ ...p, [key]: 'fail' }));
+      }
+      setTimeout(() => setTestStatus((p) => ({ ...p, [key]: 'idle' })), 3000);
+      return;
+    }
+
     await new Promise((r) => setTimeout(r, 1200));
     setTestStatus((p) => ({ ...p, [key]: 'ok' }));
     setTimeout(() => setTestStatus((p) => ({ ...p, [key]: 'idle' })), 3000);
@@ -397,8 +425,10 @@ export default function ConfigurationPage() {
           <Toggle on={config.cloudinary.enabled} onChange={(v) => merge('cloudinary', { enabled: v })} label="Enable Cloudinary" />
           {config.cloudinary.enabled && (
             <>
-              <Field label="Cloud Name"><input style={inputStyle} value={config.cloudinary.cloudName ?? ''} onChange={(e) => merge('cloudinary', { cloudName: e.target.value })} placeholder="my-cloud" /></Field>
-              <Field label="Upload Preset"><input style={inputStyle} value={config.cloudinary.uploadPreset ?? ''} onChange={(e) => merge('cloudinary', { uploadPreset: e.target.value })} placeholder="ml_default" /></Field>
+              <Field label="Cloud Name"><input style={inputStyle} value={config.cloudinary.cloudName ?? ''} onChange={(e) => merge('cloudinary', { cloudName: e.target.value })} placeholder="dxyz9abcd" /></Field>
+              <Field label="Upload Preset"><input style={inputStyle} value={config.cloudinary.uploadPreset ?? ''} onChange={(e) => merge('cloudinary', { uploadPreset: e.target.value })} placeholder="tradecircle_unsigned" /></Field>
+              <Field label="API Key (optional, server-side)"><input style={inputStyle} value={config.cloudinary.apiKey ?? ''} onChange={(e) => merge('cloudinary', { apiKey: e.target.value })} placeholder="123456789012345" /></Field>
+              <Field label="API Secret (optional, server-side)"><input type="password" style={inputStyle} value={config.cloudinary.apiSecret ?? ''} onChange={(e) => merge('cloudinary', { apiSecret: e.target.value })} placeholder="••••••••" /></Field>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
                 <TestBtn id="cloudinary" />
                 <SaveBtn onSave={() => void saveSection({ cloudinary: config.cloudinary })} saving={saving} saved={saved} />

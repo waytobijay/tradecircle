@@ -40,6 +40,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { PublicLayout } from '@/components/layouts/PublicLayout';
+import { MediaBackground } from '@/components/ui/MediaBackground';
+import { useMediaBackground } from '@/hooks/useMediaBackground';
 import type { Product, User } from '@/types';
 
 // ─────────────────────────────────────────────
@@ -241,182 +243,163 @@ function formatPrice(price: number, currency: string): string {
 
 function HeroSection() {
   const [hovered, setHovered] = useState(false);
+  const { slides } = useMediaBackground();
 
   return (
     <section
       style={{
+        position:        'relative',
         minHeight:       '100vh',
         display:         'flex',
         alignItems:      'center',
         padding:         'var(--space-section) var(--space-6)',
-        background:      'linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 4%, var(--color-bg-primary)) 0%, var(--color-bg-primary) 60%)',
+        overflow:        'hidden',
+        // Solid base — MediaBackground sits behind via fixed z:-1.
+        background:      'transparent',
       }}
     >
+      {/* Cinematic blurred CMS-managed media background. */}
+      <MediaBackground slides={slides} blurPx={28} overlayOpacity={0.62} intervalSec={7} />
+
+      {/* Subtle floating mockup decorations (CSS only) — corners. */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', top: '12%', right: '6%', width: 180, height: 120,
+        borderRadius: 18,
+        background: 'rgba(255,255,255,0.10)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255,255,255,0.18)',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
+        transform: 'rotate(-6deg)',
+        pointerEvents: 'none',
+        display: 'none',
+      }}
+        className="tc-hero-decoration"
+      />
+      <div aria-hidden="true" style={{
+        position: 'absolute', bottom: '14%', left: '5%', width: 160, height: 110,
+        borderRadius: 18,
+        background: 'rgba(255,255,255,0.10)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255,255,255,0.18)',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
+        transform: 'rotate(8deg)',
+        pointerEvents: 'none',
+        display: 'none',
+      }}
+        className="tc-hero-decoration"
+      />
+      <style>{`
+        @media (min-width: 1024px) {
+          .tc-hero-decoration { display: block !important; }
+        }
+      `}</style>
+      {/* Centered glass card with headline + CTAs. */}
       <div
         style={{
-          maxWidth:      '1200px',
-          margin:        '0 auto',
-          width:         '100%',
-          display:       'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap:           'var(--space-section)',
-          alignItems:    'center',
+          position: 'relative',
+          maxWidth: 820,
+          margin: '0 auto',
+          width: '100%',
+          padding: 'clamp(28px, 5vw, 48px)',
+          borderRadius: 24,
+          background: 'rgba(255,255,255,0.10)',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.22)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.35)',
+          textAlign: 'center',
+          color: '#ffffff',
         }}
       >
-        {/* Left — headline + CTAs */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
-          <div>
-            <h1
-              className="font-display font-bold"
-              style={{
-                fontSize:   'clamp(2.25rem, 5vw, 3.5rem)',
-                lineHeight: 1.1,
-                color:      'var(--color-text-primary)',
-                margin:     0,
-              }}
-            >
-              Buy. Sell. Advise.{' '}
-              <span style={{ color: 'var(--color-primary)' }}>Together.</span>
-            </h1>
-            <p
-              style={{
-                marginTop:  'var(--space-base)',
-                fontSize:   '1.125rem',
-                lineHeight: 1.6,
-                color:      'var(--color-text-secondary)',
-                maxWidth:   '480px',
-              }}
-            >
-              A trusted community marketplace connecting buyers, sellers, and advisors near you.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
-            {/* Primary CTA */}
-            <Link
-              href="/signup"
-              onMouseEnter={() => setHovered(true)}
-              onMouseLeave={() => setHovered(false)}
-              style={{
-                display:         'inline-flex',
-                alignItems:      'center',
-                gap:             'var(--space-xs)',
-                padding:         '14px 28px',
-                borderRadius:    'var(--radius-pill)',
-                backgroundColor: 'var(--color-primary)',
-                color:           '#ffffff',
-                fontWeight:      600,
-                fontSize:        '15px',
-                textDecoration:  'none',
-                transition:      'transform 0.15s ease, box-shadow 0.15s ease',
-                transform:       hovered ? 'scale(1.03)' : 'scale(1)',
-                boxShadow:       hovered
-                  ? '0 0 0 6px color-mix(in srgb, var(--color-primary) 20%, transparent), 0 4px 16px rgba(0,0,0,0.15)'
-                  : '0 4px 12px rgba(0,0,0,0.10)',
-              }}
-            >
-              Get Started — It&apos;s Free
-              <ArrowRight size={16} />
-            </Link>
-
-            {/* Secondary CTA */}
-            <Link
-              href="/search"
-              style={{
-                display:         'inline-flex',
-                alignItems:      'center',
-                gap:             'var(--space-xs)',
-                padding:         '14px 28px',
-                borderRadius:    'var(--radius-pill)',
-                backgroundColor: 'transparent',
-                color:           'var(--color-text-primary)',
-                fontWeight:      500,
-                fontSize:        '15px',
-                textDecoration:  'none',
-                border:          '1.5px solid var(--color-border)',
-                transition:      'border-color 0.15s ease, background-color 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--color-primary)';
-                (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'color-mix(in srgb, var(--color-primary) 5%, transparent)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--color-border)';
-                (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'transparent';
-              }}
-            >
-              Browse Products
-            </Link>
-          </div>
-        </div>
-
-        {/* Right — animated card stack */}
-        <div
+        <h1
+          className="font-display font-bold"
           style={{
-            display:        'flex',
-            justifyContent: 'center',
-            alignItems:     'center',
-            perspective:    '800px',
+            margin: 0,
+            fontFamily: 'var(--font-display, Sora), system-ui',
+            fontSize: 'clamp(2.375rem, 6vw, 3.5rem)',
+            lineHeight: 1.05,
+            letterSpacing: '-0.02em',
+            color: '#ffffff',
           }}
         >
-          <style>{`
-            @keyframes tc-float-0 {
-              0%,100% { transform: rotateY(-8deg) rotateX(4deg) translateY(0px); }
-              50%      { transform: rotateY(-8deg) rotateX(4deg) translateY(-10px); }
-            }
-            @keyframes tc-float-1 {
-              0%,100% { transform: rotateY(-4deg) rotateX(2deg) translateY(-6px); }
-              50%      { transform: rotateY(-4deg) rotateX(2deg) translateY(-18px); }
-            }
-            @keyframes tc-float-2 {
-              0%,100% { transform: rotateY(0deg) rotateX(0deg) translateY(-12px); }
-              50%      { transform: rotateY(0deg) rotateX(0deg) translateY(-24px); }
-            }
-          `}</style>
+          The all-in-one trading platform
+        </h1>
+        <p
+          style={{
+            margin: '18px auto 0',
+            maxWidth: 560,
+            fontSize: 'clamp(1rem, 1.6vw, 1.125rem)',
+            lineHeight: 1.6,
+            color: 'rgba(255,255,255,0.85)',
+          }}
+        >
+          Buy, sell, and get expert advice — all in one trusted community marketplace connecting people near you.
+        </p>
 
-          <div style={{ position: 'relative', width: '260px', height: '320px' }}>
-            {[
-              { label: 'Vintage Camera',  price: 'AUD 240',  delay: '0s',    anim: 'tc-float-0', z: 0 },
-              { label: 'Trade Advisory',  price: 'Free',      delay: '0.3s',  anim: 'tc-float-1', z: 1 },
-              { label: 'Handmade Crafts', price: 'AUD 85',   delay: '0.6s',  anim: 'tc-float-2', z: 2 },
-            ].map(({ label, price, delay, anim, z }) => (
-              <div
-                key={label}
-                style={{
-                  position:        'absolute',
-                  top:             `${z * 20}px`,
-                  left:            `${z * 12}px`,
-                  width:           '220px',
-                  borderRadius:    'var(--radius-lg)',
-                  backgroundColor: 'var(--color-bg-primary)',
-                  border:          '1px solid var(--color-border)',
-                  boxShadow:       '0 8px 32px rgba(0,0,0,0.12)',
-                  padding:         'var(--space-base)',
-                  animationName:   anim,
-                  animationDuration:'3s',
-                  animationDelay:  delay,
-                  animationTimingFunction: 'ease-in-out',
-                  animationIterationCount: 'infinite',
-                }}
-              >
-                {/* Placeholder image */}
-                <div
-                  style={{
-                    height:          '120px',
-                    borderRadius:    'var(--radius-md)',
-                    backgroundColor: `color-mix(in srgb, var(--color-primary) ${10 + z * 5}%, var(--color-bg-secondary))`,
-                    marginBottom:    'var(--space-sm)',
-                  }}
-                />
-                <p style={{ margin: 0, fontWeight: 600, fontSize: '14px', color: 'var(--color-text-primary)' }}>
-                  {label}
-                </p>
-                <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--color-primary)', fontWeight: 500 }}>
-                  {price}
-                </p>
-              </div>
-            ))}
-          </div>
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            marginTop: 28,
+          }}
+        >
+          {/* Primary CTA — gradient */}
+          <Link
+            href="/signup"
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '14px 28px',
+              borderRadius: 'var(--radius-pill)',
+              background: 'linear-gradient(135deg, var(--color-primary), #1e3a8a)',
+              color: '#ffffff',
+              fontWeight: 600,
+              fontSize: 15,
+              textDecoration: 'none',
+              transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+              transform: hovered ? 'scale(1.03)' : 'scale(1)',
+              boxShadow: hovered
+                ? '0 12px 32px rgba(30,58,138,0.45)'
+                : '0 6px 18px rgba(30,58,138,0.30)',
+            }}
+          >
+            Get Started
+            <ArrowRight size={16} />
+          </Link>
+
+          {/* Ghost CTA */}
+          <Link
+            href="#how-it-works"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '14px 28px',
+              borderRadius: 'var(--radius-pill)',
+              background: 'rgba(255,255,255,0.10)',
+              color: '#ffffff',
+              fontWeight: 500,
+              fontSize: 15,
+              textDecoration: 'none',
+              border: '1.5px solid rgba(255,255,255,0.35)',
+              transition: 'background-color 0.15s ease, border-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.20)';
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.55)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.10)';
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.35)';
+            }}
+          >
+            How it works
+          </Link>
         </div>
       </div>
     </section>
@@ -510,6 +493,7 @@ function RoleCard({
 function HowItWorksSection() {
   return (
     <section
+      id="how-it-works"
       style={{
         padding:         'var(--space-section) var(--space-6)',
         backgroundColor: 'var(--color-bg-secondary)',

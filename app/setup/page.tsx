@@ -1,62 +1,26 @@
 /**
  * app/setup/page.tsx
- * First-time admin setup — creates the bootstrap super-admin account.
+ * First-time admin setup — creates the BOOTSTRAP super-admin in a local file.
  *
- * Access rules:
- *   - Page is publicly reachable (no auth cookie required).
- *   - If ANY adminUsers doc with role='super-admin' already exists, the page
- *     redirects to /login?message=setup-complete to lock further setup.
+ * This runs BEFORE Firebase is configured. The created credentials live in
+ * `.tradecircle-local/config.json`; once Firebase is wired up via the
+ * /admin/firebase-setup wizard, the operator can migrate the local admin
+ * into the real Firebase project.
  *
  * Flow:
- *   1. createUserWithEmailAndPassword(auth, email, password)
- *   2. updateProfile(user, { displayName: name })
- *   3. Write adminUsers/{uid} with role='super-admin', all 13 permissions=true
- *   4. POST /api/session with idToken to mint admin session cookies
- *   5. Redirect to /admin/dashboard?welcome=true
+ *   1. POST /api/local-auth/setup  { name, email, password }
+ *   2. Session cookies are set by that endpoint.
+ *   3. Redirect to /admin/firebase-setup
  *
- * Spec ref: section 6.7 (Admin Portal — first-run bootstrap)
+ * If a local admin already exists, /api/setup-check reports it and we
+ * redirect to /login?message=setup-complete.
  */
 
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  createUserWithEmailAndPassword,
-  updateProfile,
-} from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDocs,
-  limit,
-  query,
-  serverTimestamp,
-  setDoc,
-  where,
-} from 'firebase/firestore';
 import { Loader2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
-
-import { auth, db } from '@/services/firebase';
-import type { AdminPermissions } from '@/types';
-
-// ─── Constants ──────────────────────────────────────────────────────────────
-
-const ALL_PERMISSIONS: AdminPermissions = {
-  users:          true,
-  products:       true,
-  config:         true,
-  exports:        true,
-  analytics:      true,
-  backup:         true,
-  advisories:     true,
-  enquiries:      true,
-  orders:         true,
-  ads:            true,
-  aiSettings:     true,
-  cms:            true,
-  featureToggles: true,
-};
 
 // ─── Validation ─────────────────────────────────────────────────────────────
 
@@ -125,34 +89,24 @@ export default function SetupPage() {
   });
   const [errors, setErrors] = useState<FormErrors>({});
 
-  // ── On mount: check whether setup has already completed ────────────────
+  // ── On mount: check whether bootstrap setup is already complete ────────
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const snap = await getDocs(
-          query(
-            collection(db, 'adminUsers'),
-            where('role', '==', 'super-admin'),
-            limit(1),
-          ),
-        );
+    fetch('/api/setup-check', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { setupComplete?: boolean } | null) => {
         if (cancelled) return;
-        if (!snap.empty) {
+        if (data?.setupComplete) {
           router.replace('/login?message=setup-complete');
           return;
         }
         setPhase('ready');
-      } catch (err) {
-        console.error('[setup] adminUsers check failed:', err);
-        if (cancelled) return;
+      })
+      .catch(() => {
         // Allow setup to proceed on read failure — better than soft-locking.
-        setPhase('ready');
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+        if (!cancelled) setPhase('ready');
+      });
+    return () => { cancelled = true; };
   }, [router]);
 
   // ── Submit ─────────────────────────────────────────────────────────────
@@ -167,67 +121,31 @@ export default function SetupPage() {
     setPhase('submitting');
 
     try {
-      // Defensive double-check right before write to defeat race conditions.
-      const racingSnap = await getDocs(
-        query(
-          collection(db, 'adminUsers'),
-          where('role', '==', 'super-admin'),
-          limit(1),
-        ),
-      );
-      if (!racingSnap.empty) {
-        router.replace('/login?message=setup-complete');
-        return;
-      }
-
-      // 1. Create Firebase Auth user
-      const credential = await createUserWithEmailAndPassword(
-        auth,
-        values.email.trim(),
-        values.password,
-      );
-
-      // 2. Set display name
-      await updateProfile(credential.user, { displayName: values.name.trim() });
-
-      // 3. Write adminUsers/{uid} document
-      await setDoc(doc(db, 'adminUsers', credential.user.uid), {
-        name:        values.name.trim(),
-        email:       values.email.trim(),
-        role:        'super-admin',
-        permissions: ALL_PERMISSIONS,
-        active:      true,
-        createdAt:   serverTimestamp(),
-      });
-
-      // 4. Exchange ID token for session cookies
-      const idToken = await credential.user.getIdToken();
-      const res = await fetch('/api/session', {
-        method: 'POST',
+      const res = await fetch('/api/local-auth/setup', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken, role: 'admin', isAdmin: true }),
+        body:    JSON.stringify({
+          name:     values.name.trim(),
+          email:    values.email.trim(),
+          password: values.password,
+        }),
       });
-      if (!res.ok) {
-        console.warn('[setup] /api/session returned', res.status);
+      const data = await res.json();
+      if (!data.ok) {
+        if (data.error === 'already_setup') {
+          router.replace('/login?message=setup-complete');
+          return;
+        }
+        throw new Error(data.error || 'Setup failed.');
       }
 
-      // 5. Redirect into the admin portal
       setPhase('redirecting');
-      router.replace('/admin/dashboard?welcome=true');
+      router.replace(data.redirect || '/admin/firebase-setup');
     } catch (err) {
       console.error('[setup] failed:', err);
-      const code = (err as { code?: string }).code;
-      let msg = 'Failed to create super-admin. Please try again.';
-      if (code === 'auth/email-already-in-use') {
-        msg = 'That email is already registered. Use a different address or sign in.';
-      } else if (code === 'auth/weak-password') {
-        msg = 'Password is too weak. Use at least 8 characters with a mix of letters and numbers.';
-      } else if (code === 'auth/invalid-email') {
-        msg = 'That email address is invalid.';
-      } else if (err instanceof Error && err.message) {
-        msg = err.message;
-      }
-      setServerError(msg);
+      setServerError(
+        err instanceof Error ? err.message : 'Failed to create super-admin.',
+      );
       setPhase('ready');
     }
   }
@@ -238,19 +156,19 @@ export default function SetupPage() {
     padding: '11px 14px',
     fontSize: 14,
     borderRadius: 10,
-    background: 'var(--color-surface, var(--color-background, #fff))',
-    color: 'var(--color-text, var(--color-text-primary, #111))',
-    border: `1px solid ${hasError ? 'var(--color-danger)' : 'var(--color-border)'}`,
+    background: '#fff',
+    color: '#0f172a',
+    border: `1px solid ${hasError ? '#dc2626' : '#cbd5e1'}`,
     outline: 'none',
     transition: 'border-color 0.15s',
   });
 
   const labelStyle: React.CSSProperties = {
     display: 'block',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 600,
     marginBottom: 6,
-    color: 'var(--color-text-secondary)',
+    color: '#334155',
   };
 
   const errorStyle: React.CSSProperties = {
@@ -319,30 +237,16 @@ export default function SetupPage() {
           >
             <ShieldCheck size={28} />
           </div>
-          <h1
-            style={{
-              fontSize: 22,
-              fontWeight: 700,
-              margin: 0,
-              marginBottom: 6,
-              color: 'var(--color-text, var(--color-text-primary))',
-            }}
-          >
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, marginBottom: 6, color: '#0f172a' }}>
             First-Time Admin Setup
           </h1>
-          <p
-            style={{
-              fontSize: 13,
-              margin: 0,
-              color: 'var(--color-text-secondary)',
-              lineHeight: 1.5,
-            }}
-          >
+          <p style={{ fontSize: 13, margin: 0, color: '#475569', lineHeight: 1.5 }}>
             Create the master super-admin account for this TradeCircle instance.
+            You&apos;ll configure Firebase right after.
           </p>
         </div>
 
-        {/* Lock warning */}
+        {/* Info */}
         <div
           style={{
             padding: '10px 12px',
@@ -355,8 +259,8 @@ export default function SetupPage() {
             marginBottom: 22,
           }}
         >
-          Setup is locked once the first super-admin is created. Choose your
-          credentials carefully.
+          These credentials are stored locally in <code>.tradecircle-local/config.json</code>
+          {' '}until Firebase is connected. The file is git-ignored automatically.
         </div>
 
         {serverError && (
@@ -379,9 +283,7 @@ export default function SetupPage() {
         <form onSubmit={handleSubmit} noValidate>
           {/* Full Name */}
           <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle} htmlFor="setup-name">
-              Full Name
-            </label>
+            <label style={labelStyle} htmlFor="setup-name">Full Name</label>
             <input
               id="setup-name"
               type="text"
@@ -398,9 +300,7 @@ export default function SetupPage() {
 
           {/* Email */}
           <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle} htmlFor="setup-email">
-              Email Address
-            </label>
+            <label style={labelStyle} htmlFor="setup-email">Email Address</label>
             <input
               id="setup-email"
               type="email"
@@ -417,9 +317,7 @@ export default function SetupPage() {
 
           {/* Password */}
           <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle} htmlFor="setup-password">
-              Password
-            </label>
+            <label style={labelStyle} htmlFor="setup-password">Password</label>
             <div style={{ position: 'relative' }}>
               <input
                 id="setup-password"
@@ -443,7 +341,7 @@ export default function SetupPage() {
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: 'var(--color-text-secondary)',
+                  color: '#64748b',
                   display: 'flex',
                   alignItems: 'center',
                 }}
@@ -457,9 +355,7 @@ export default function SetupPage() {
 
           {/* Confirm Password */}
           <div style={{ marginBottom: 22 }}>
-            <label style={labelStyle} htmlFor="setup-confirm">
-              Confirm Password
-            </label>
+            <label style={labelStyle} htmlFor="setup-confirm">Confirm Password</label>
             <input
               id="setup-confirm"
               type={showPassword ? 'text' : 'password'}

@@ -269,6 +269,8 @@ export interface CloudinaryConfig {
   enabled: boolean;
   cloudName?: string;
   uploadPreset?: string;
+  apiKey?: string;
+  apiSecret?: string;
 }
 
 export interface S3Config {
@@ -485,7 +487,11 @@ export type AdminLogAction =
   | 'restore'
   | 'delete'
   | 'config-change'
+  | 'user-create'
+  | 'user-update'
+  | 'user-delete'
   | 'user-ban'
+  | 'user-unban'
   | 'product-remove';
 
 export type AdminLogStatus = 'success' | 'failed';
@@ -493,15 +499,17 @@ export type AdminLogStatus = 'success' | 'failed';
 export interface AdminLog {
   id: string;
   adminUid: string;
-  adminEmail: string;
+  adminEmail?: string;
   action: AdminLogAction;
   scope?: string;
   targetCollection?: string;
+  targetUid?: string;
   recordCount?: number;
   ipAddress?: string;
   timestamp: Timestamp;
   status: AdminLogStatus;
   notes?: string;
+  errorMessage?: string;
 }
 
 // ─────────────────────────────────────────────
