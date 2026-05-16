@@ -139,12 +139,30 @@ export async function readLocalConfig(): Promise<LocalConfig | null> {
 }
 
 /**
+ * True if running in a serverless / read-only filesystem environment.
+ * On Vercel + AWS Lambda the project files live under /var/task which is
+ * read-only — only /tmp is writable, and even that is wiped between calls.
+ */
+export function isReadOnlyEnv(): boolean {
+  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+}
+
+/**
  * Merge-write the local config.
  * Generates `sessionSecret` on first write.
+ * Throws a clear error in read-only environments so callers can react with
+ * a friendly message instead of an ENOENT/EROFS crash.
  */
 export async function writeLocalConfig(
   patch: Partial<LocalConfig>,
 ): Promise<LocalConfig> {
+  if (isReadOnlyEnv()) {
+    throw new Error(
+      'Local config writes are not supported in this environment ' +
+      '(Vercel / Lambda have a read-only filesystem). ' +
+      'Use Firebase Admin SDK instead — set FIREBASE_SERVICE_ACCOUNT_JSON.',
+    );
+  }
   await ensureDir();
   const existing = (await readLocalConfig()) ?? {
     sessionSecret: crypto.randomBytes(32).toString('hex'),
