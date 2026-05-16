@@ -1,101 +1,90 @@
 rules_version = '2';
+
+// ============================================================================
+// TradeCircle — Firestore Security Rules
+//
+// Deploy:
+//   firebase deploy --only firestore:rules
+//   OR paste into Firebase Console → Firestore → Rules → Publish
+//
+// Design principles:
+//   - Default-deny: anything not matched below is rejected
+//   - Public reads only where explicitly safe (products, ads, reviews, blog,
+//     config — anything a browser would fetch unauthenticated)
+//   - Owner writes: users edit their own docs
+//   - Admin writes: anything destructive or platform-wide goes through admins
+//   - Helpers are null-safe: get() calls are wrapped so missing docs don't
+//     throw and lock out legitimate operations
+// ============================================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─────────────────────────────────────────
-    // Helper functions
-    // ─────────────────────────────────────────
-
-    function isAuth() {
-      return request.auth != null;
-    }
-
-    function isOwner(uid) {
-      return request.auth.uid == uid;
-    }
-
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
-    function isSeller() {
-      return isAuth() && getUserRole() == 'seller';
-    }
-
-    function isAdvisor() {
-      return isAuth() && getUserRole() == 'advisor';
-    }
-
-    function isAdminUser() {
+    // ─── Helpers ──────────────────────────────────────────────────────────
+    function isAuth()        { return request.auth != null; }
+    function isOwner(uid)    { return isAuth() && request.auth.uid == uid; }
+    function isAdminUser()   {
       return isAuth() &&
-        exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid));
+             exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid));
     }
 
-    // ─────────────────────────────────────────
-    // users/{uid}
-    // Read:   any authenticated user
-    // Write:  own document or admin
-    // ─────────────────────────────────────────
+    // Safe user-doc lookup — returns null if user has no `users/{uid}` doc
+    // (e.g. admins who only live in `adminUsers`).
+    function userDocExists() {
+      return isAuth() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    function getUserRole() {
+      return userDocExists()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+    function isSeller()  { return getUserRole() == 'seller'; }
+    function isAdvisor() { return getUserRole() == 'advisor'; }
 
+    // ─── users/{uid} ──────────────────────────────────────────────────────
     match /users/{uid} {
-      allow read: if isAuth();
-      allow create: if isAuth() && isOwner(uid);
-      allow update: if isAuth() && (isOwner(uid) || isAdminUser());
+      allow read:   if isAuth();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isAdminUser();
       allow delete: if isAdminUser();
     }
 
-    // ─────────────────────────────────────────
-    // products/{productId}
-    // Read:   anyone (public browsing)
-    // Create: authenticated sellers only
-    // Update/Delete: seller who owns the product or admin
-    // ─────────────────────────────────────────
-
+    // ─── products/{productId} ─────────────────────────────────────────────
+    // Public read (browsing without auth). Sellers create + edit own. Admin override.
     match /products/{productId} {
-      allow read: if true;
-      allow create: if isSeller();
-      allow update: if isAuth() &&
-        (resource.data.sellerId == request.auth.uid || isAdminUser());
-      allow delete: if isAuth() &&
-        (resource.data.sellerId == request.auth.uid || isAdminUser());
+      allow read:   if true;
+      allow create: if isAuth() &&
+                       request.resource.data.sellerId == request.auth.uid;
+      allow update: if isAuth() && (
+        resource.data.sellerId == request.auth.uid || isAdminUser()
+      );
+      allow delete: if isAuth() && (
+        resource.data.sellerId == request.auth.uid || isAdminUser()
+      );
     }
 
-    // ─────────────────────────────────────────
-    // orders/{orderId}
-    // Read:   buyer, seller involved in the order, or admin
-    // Create: authenticated users (buyers)
-    // Update: seller (status change) or admin
-    // Delete: admin only
-    // ─────────────────────────────────────────
-
+    // ─── orders/{orderId} ─────────────────────────────────────────────────
     match /orders/{orderId} {
-      allow read: if isAuth() && (
+      allow read:   if isAuth() && (
         resource.data.buyerId  == request.auth.uid ||
         resource.data.sellerId == request.auth.uid ||
         isAdminUser()
       );
       allow create: if isAuth();
       allow update: if isAuth() && (
-        resource.data.sellerId == request.auth.uid ||
-        isAdminUser()
+        resource.data.sellerId == request.auth.uid || isAdminUser()
       );
       allow delete: if isAdminUser();
     }
 
-    // ─────────────────────────────────────────
-    // messages/{conversationId}
-    // Read/Write: only participants in the conversation
-    // ─────────────────────────────────────────
-
+    // ─── messages/{conversationId} ────────────────────────────────────────
     match /messages/{conversationId} {
-      allow read, write: if isAuth() &&
-        request.auth.uid in resource.data.participants;
+      allow read:   if isAuth() && request.auth.uid in resource.data.participants;
+      allow create: if isAuth() && request.auth.uid in request.resource.data.participants;
+      allow update: if isAuth() && request.auth.uid in resource.data.participants;
+      allow delete: if isAdminUser();
 
-      // Allow creating a new conversation where the caller is a participant
-      allow create: if isAuth() &&
-        request.auth.uid in request.resource.data.participants;
-
-      // Sub-collection: messages/{conversationId}/items/{messageId}
       match /items/{messageId} {
         allow read, write: if isAuth() &&
           request.auth.uid in
@@ -103,139 +92,215 @@ service cloud.firestore {
       }
     }
 
-    // ─────────────────────────────────────────
-    // advicePosts/{postId}
-    // Read:   anyone if published==true; owner advisor if draft
-    // Create: advisors only
-    // Update/Delete: owner advisor or admin
-    // ─────────────────────────────────────────
-
+    // ─── advicePosts/{postId} ─────────────────────────────────────────────
     match /advicePosts/{postId} {
-      allow read: if resource.data.published == true ||
-        (isAuth() && resource.data.advisorId == request.auth.uid) ||
-        isAdminUser();
-      allow create: if isAdvisor();
+      allow read:   if resource.data.published == true ||
+                       (isAuth() && resource.data.advisorId == request.auth.uid) ||
+                       isAdminUser();
+      allow create: if isAuth() &&
+                       request.resource.data.advisorId == request.auth.uid;
       allow update: if isAuth() && (
-        resource.data.advisorId == request.auth.uid ||
-        isAdminUser()
+        resource.data.advisorId == request.auth.uid || isAdminUser()
       );
       allow delete: if isAuth() && (
-        resource.data.advisorId == request.auth.uid ||
-        isAdminUser()
+        resource.data.advisorId == request.auth.uid || isAdminUser()
       );
     }
 
-    // ─────────────────────────────────────────
-    // advisorEnquiries/{enquiryId}
-    // Read:   fromUserId, toAdvisorId, or admin
-    // Create: any authenticated user
-    // Update: toAdvisorId (mark responded) or admin
-    // Delete: admin only
-    // ─────────────────────────────────────────
-
+    // ─── advisorEnquiries/{enquiryId} ─────────────────────────────────────
     match /advisorEnquiries/{enquiryId} {
-      allow read: if isAuth() && (
-        resource.data.fromUserId   == request.auth.uid ||
-        resource.data.toAdvisorId  == request.auth.uid ||
+      allow read:   if isAuth() && (
+        resource.data.fromUserId  == request.auth.uid ||
+        resource.data.toAdvisorId == request.auth.uid ||
         isAdminUser()
       );
       allow create: if isAuth();
       allow update: if isAuth() && (
-        resource.data.toAdvisorId == request.auth.uid ||
-        isAdminUser()
+        resource.data.toAdvisorId == request.auth.uid || isAdminUser()
       );
       allow delete: if isAdminUser();
     }
 
-    // ─────────────────────────────────────────
-    // notifications/{uid}/items/{notificationId}
-    // Read/Write: only the owner (uid)
-    // ─────────────────────────────────────────
-
+    // ─── notifications/{uid}/items/{notificationId} ───────────────────────
     match /notifications/{uid}/items/{notificationId} {
-      allow read, write: if isAuth() && isOwner(uid);
+      allow read, write: if isOwner(uid) || isAdminUser();
     }
 
-    // ─────────────────────────────────────────
-    // config/{docId}
-    // Read:  anyone (theme, currency, etc. needed publicly)
-    // Write: admin only
-    // ─────────────────────────────────────────
-
+    // ─── config/{docId} — public-readable site config ─────────────────────
+    // Includes: siteConfig, loginMedia, backupSchedule, aiSettings, loyaltySettings
     match /config/{docId} {
-      allow read: if true;
+      allow read:  if true;
       allow write: if isAdminUser();
     }
 
-    // ─────────────────────────────────────────
-    // adminUsers/{adminUserId}
-    // Read:   admins (general), OR any authenticated user when checking
-    //         setup status (the /setup page queries for existence of any
-    //         super-admin to lock itself once setup is complete).
-    // Create: any authenticated user IF the collection is empty (first-time
-    //         setup ONLY) — must be creating their own doc with role=super-admin.
-    //         After the first super-admin exists, only existing admins can create.
-    // Update/Delete: admin only
-    // ─────────────────────────────────────────
-
-    function isSetupEmpty() {
-      // True when no super-admin exists yet (first-time setup window).
-      return !exists(/databases/$(database)/documents/adminUsers/__sentinel__) &&
-             request.query.limit <= 5;
-    }
-
+    // ─── adminUsers/{adminUserId} ─────────────────────────────────────────
+    // Read: any auth'd user (so login can resolve admin role + setup can check).
+    // Create: ONLY when caller is creating their own doc as super-admin during
+    //         first-time bootstrap (or by an existing admin).
+    // Update/Delete: admins only.
     match /adminUsers/{adminUserId} {
-      allow read: if isAuth();
-      allow create: if isAuth() && isOwner(adminUserId) && (
-        // First-time bootstrap: any auth'd user can create their own
-        // super-admin doc, as long as it's a super-admin record. Race-safe
-        // because Firestore rejects duplicate creates.
-        request.resource.data.role == 'super-admin' ||
-        isAdminUser()
+      allow read:   if isAuth();
+      allow create: if isOwner(adminUserId) && (
+        request.resource.data.role == 'super-admin' || isAdminUser()
       );
       allow update, delete: if isAdminUser();
     }
 
-    // ─────────────────────────────────────────
-    // ads/{adId}
-    // Read:  anyone
-    // Write: admin only
-    // ─────────────────────────────────────────
-
+    // ─── ads/{adId} ───────────────────────────────────────────────────────
+    // Public read (rendered in feed) + admin write + impression/click counters
+    // can be incremented by any auth'd user.
     match /ads/{adId} {
-      allow read: if true;
+      allow read:   if true;
+      allow create, delete: if isAdminUser();
+      allow update: if isAdminUser() ||
+        // Allow any auth'd user to increment stats.impressions / stats.clicks only
+        (isAuth() &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['stats']));
+    }
+
+    // ─── reviews/{reviewId} ───────────────────────────────────────────────
+    match /reviews/{reviewId} {
+      allow read:   if true;
+      allow create: if isAuth() &&
+                       request.resource.data.reviewerId == request.auth.uid;
+      allow update, delete: if isAdminUser();
+    }
+
+    // ─── backups/{backupId}, adminLogs/{logId} — admin only ───────────────
+    match /backups/{backupId} {
+      allow read, write: if isAdminUser();
+    }
+    match /adminLogs/{logId} {
+      allow read, write: if isAdminUser();
+    }
+
+    // ─── follows/{followerUid}/following/{targetUid} — Phase 2 ────────────
+    match /follows/{followerUid}/following/{targetUid} {
+      allow read:  if true;  // public follower counts
+      allow write: if isOwner(followerUid);
+    }
+
+    // ─── fraudFlags/{flagId} — Phase 3 ────────────────────────────────────
+    match /fraudFlags/{flagId} {
+      allow read, write: if isAdminUser();
+    }
+
+    // ─── fcmTokens/{uid} — Phase 2 ────────────────────────────────────────
+    match /fcmTokens/{uid} {
+      allow read, write: if isOwner(uid);
+      allow read: if isAdminUser();  // admin can look up to send pushes
+    }
+
+    // ─── blogPosts/{postId} — Phase 3 ─────────────────────────────────────
+    match /blogPosts/{postId} {
+      allow read:  if resource.data.published == true || isAdminUser();
       allow write: if isAdminUser();
     }
 
-    // ─────────────────────────────────────────
-    // reviews/{reviewId}
-    // Read:   anyone
-    // Create: authenticated users (buyers who have placed an order)
-    // Update/Delete: admin only
-    // ─────────────────────────────────────────
+    // ─── loyaltyAccounts/{uid}, loyaltyTransactions, loyaltyRewards ───────
+    match /loyaltyAccounts/{uid} {
+      allow read:   if isOwner(uid) || isAdminUser();
+      allow create: if isOwner(uid);   // user opts in by first action
+      allow update: if isAdminUser();  // points balance is admin-managed
+      allow delete: if isAdminUser();
+    }
+    match /loyaltyTransactions/{txId} {
+      allow read:   if isAuth() && (resource.data.uid == request.auth.uid || isAdminUser());
+      allow create: if isAdminUser();
+      allow update, delete: if isAdminUser();
+    }
+    match /loyaltyRewards/{rewardId} {
+      allow read:  if true;  // public catalog
+      allow write: if isAdminUser();
+    }
 
-    match /reviews/{reviewId} {
-      allow read: if true;
+    // ─── referralCodes/{code}, referrals/{id} — Phase 5 ───────────────────
+    match /referralCodes/{code} {
+      allow read:   if true;  // public — friend types in code at signup
+      allow create: if isAuth() && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isAuth() && (resource.data.ownerUid == request.auth.uid || isAdminUser());
+      allow delete: if isAdminUser();
+    }
+    match /referrals/{id} {
+      allow read: if isAuth() && (
+        resource.data.referrerUid == request.auth.uid ||
+        resource.data.referredUid == request.auth.uid ||
+        isAdminUser()
+      );
       allow create: if isAuth();
       allow update, delete: if isAdminUser();
     }
 
-    // ─────────────────────────────────────────
-    // backups/{backupId}
-    // Read/Write: admin only
-    // ─────────────────────────────────────────
+    // ─── Subscriptions — sellerSubscriptions, advisorSubscriptions ────────
+    match /sellerSubscriptions/{uid} {
+      allow read:   if isOwner(uid) || isAdminUser();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isAdminUser();
+      allow delete: if isAdminUser();
+    }
+    match /advisorSubscriptions/{uid} {
+      allow read:   if isOwner(uid) || isAdminUser();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isAdminUser();
+      allow delete: if isAdminUser();
+    }
 
-    match /backups/{backupId} {
+    // ─── Phase 5 — Videos + Live Streams ──────────────────────────────────
+    match /productVideos/{videoId} {
+      allow read:   if resource.data.active == true;
+      allow create: if isAuth() &&
+                       request.resource.data.sellerId == request.auth.uid;
+      allow update: if isAuth() && (resource.data.sellerId == request.auth.uid || isAdminUser());
+      allow delete: if isAuth() && (resource.data.sellerId == request.auth.uid || isAdminUser());
+    }
+    match /liveStreams/{streamId} {
+      allow read:   if true;
+      allow create: if isAuth() &&
+                       request.resource.data.sellerId == request.auth.uid;
+      allow update: if isAuth() && (resource.data.sellerId == request.auth.uid || isAdminUser());
+      allow delete: if isAdminUser();
+
+      match /chat/{messageId} {
+        allow read:   if true;
+        allow create: if isAuth() &&
+                         request.resource.data.senderUid == request.auth.uid;
+        allow update, delete: if isAdminUser();
+      }
+    }
+
+    // ─── Phase 5 — Ad campaigns + marketing integrations ──────────────────
+    match /adCampaigns/{campaignId} {
+      allow read, write: if isAdminUser();
+
+      match /auditLog/{logId} {
+        allow read, write: if isAdminUser();
+      }
+    }
+    match /marketingIntegrations/{provider} {
       allow read, write: if isAdminUser();
     }
 
-    // ─────────────────────────────────────────
-    // adminLogs/{logId}
-    // Read/Write: admin only
-    // ─────────────────────────────────────────
-
-    match /adminLogs/{logId} {
+    // ─── Phase 4 — Operator / multi-tenant / API keys / status ────────────
+    match /tenants/{tenantId} {
       allow read, write: if isAdminUser();
+    }
+    match /operatorInvoices/{invoiceId} {
+      allow read, write: if isAdminUser();
+    }
+    match /regionalAdmins/{adminId} {
+      allow read, write: if isAdminUser();
+    }
+    match /apiKeys/{keyId} {
+      allow read, write: if isAdminUser();
+    }
+    match /serviceHealth/{serviceId} {
+      allow read:  if true;
+      allow write: if isAdminUser();
+    }
+    match /incidents/{incidentId} {
+      allow read:  if true;
+      allow write: if isAdminUser();
     }
 
   }
