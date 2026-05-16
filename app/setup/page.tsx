@@ -130,13 +130,33 @@ export default function SetupPage() {
           password: values.password,
         }),
       });
-      const data = await res.json();
+
+      // Safely parse response — server may return empty body on crash
+      const text = await res.text();
+      let data: { ok?: boolean; error?: string; message?: string; redirect?: string } = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error(
+            `Server returned non-JSON response (HTTP ${res.status}). ` +
+            `Check Vercel runtime logs. First 200 chars: ${text.slice(0, 200)}`,
+          );
+        }
+      } else {
+        throw new Error(
+          `Server returned empty response (HTTP ${res.status}). ` +
+          `On Vercel, this usually means FIREBASE_SERVICE_ACCOUNT_JSON is not set. ` +
+          `Add it in Vercel → Settings → Environment Variables and redeploy.`,
+        );
+      }
+
       if (!data.ok) {
         if (data.error === 'already_setup') {
           router.replace('/login?message=setup-complete');
           return;
         }
-        throw new Error(data.error || 'Setup failed.');
+        throw new Error(data.message || data.error || `Setup failed (HTTP ${res.status}).`);
       }
 
       setPhase('redirecting');

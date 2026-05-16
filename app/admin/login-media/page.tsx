@@ -312,13 +312,15 @@ function iconBtnStyle(disabled: boolean): React.CSSProperties {
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function LoginMediaPage() {
-  const [enabled, setEnabled] = useState(true);
-  const [slides, setSlides]   = useState<MediaSlide[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [saveOk, setSaveOk]   = useState(false);
-  const [saveErr, setSaveErr] = useState('');
-  const [addOpen, setAddOpen] = useState(false);
+  const [enabled, setEnabled]         = useState(true);
+  const [slides, setSlides]           = useState<MediaSlide[]>([]);
+  const [blurPx, setBlurPx]           = useState(24);
+  const [intervalSec, setIntervalSec] = useState(6);
+  const [loading, setLoading]         = useState(true);
+  const [saving, setSaving]           = useState(false);
+  const [saveOk, setSaveOk]           = useState(false);
+  const [saveErr, setSaveErr]         = useState('');
+  const [addOpen, setAddOpen]         = useState(false);
 
   // Load existing config.
   useEffect(() => {
@@ -328,9 +330,16 @@ export default function LoginMediaPage() {
       .then((snap) => {
         if (cancelled) return;
         if (snap.exists()) {
-          const data = snap.data() as { enabled?: boolean; slides?: MediaSlide[] };
+          const data = snap.data() as {
+            enabled?:     boolean;
+            slides?:      MediaSlide[];
+            blurPx?:      number;
+            intervalSec?: number;
+          };
           setEnabled(data.enabled !== false);
           setSlides(Array.isArray(data.slides) ? data.slides : []);
+          if (typeof data.blurPx === 'number')      setBlurPx(data.blurPx);
+          if (typeof data.intervalSec === 'number') setIntervalSec(data.intervalSec);
         }
       })
       .catch(() => { /* ignore — leave defaults */ })
@@ -372,6 +381,8 @@ export default function LoginMediaPage() {
       await setDoc(doc(db, 'config', 'loginMedia'), {
         enabled,
         slides: slides.filter((s) => s.url.trim().length > 0),
+        blurPx,
+        intervalSec,
         updatedAt: new Date().toISOString(),
       }, { merge: true });
       setSaveOk(true);
@@ -461,6 +472,42 @@ export default function LoginMediaPage() {
                 Recommended: 16:9 ratio, min 1920×1080. Keep images under 5 MB and videos under 10 MB.
               </p>
 
+              {/* Blur + interval sliders */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                <div>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 500, color: 'var(--color-text)', marginBottom: 4 }}>
+                    <span>Blur</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>{blurPx}px</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={60}
+                    step={1}
+                    value={blurPx}
+                    onChange={(e) => setBlurPx(Number(e.target.value))}
+                    style={{ width: '100%' }}
+                    aria-label="Background blur in pixels"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 500, color: 'var(--color-text)', marginBottom: 4 }}>
+                    <span>Slide interval</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>{intervalSec}s</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={2}
+                    max={20}
+                    step={1}
+                    value={intervalSec}
+                    onChange={(e) => setIntervalSec(Number(e.target.value))}
+                    style={{ width: '100%' }}
+                    aria-label="Slide interval in seconds"
+                  />
+                </div>
+              </div>
+
               {/* Slides list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                 {slides.length === 0 ? (
@@ -549,7 +596,7 @@ export default function LoginMediaPage() {
                     fixed positioning via an isolating wrapper. The component uses
                     position:fixed which we re-cast to absolute through a transform
                     isolation hack — render it conditionally and contained. */}
-                <PreviewBackground slides={previewSlides} />
+                <PreviewBackground slides={previewSlides} blurPx={blurPx} intervalSec={intervalSec} />
                 {/* Glass card mockup */}
                 <div style={{
                   position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
@@ -586,7 +633,15 @@ export default function LoginMediaPage() {
  * contained absolutely inside its parent (since the real one uses position:fixed
  * for fullscreen page use).
  */
-function PreviewBackground({ slides }: { slides: MediaSlide[] }) {
+function PreviewBackground({
+  slides,
+  blurPx,
+  intervalSec,
+}: {
+  slides:      MediaSlide[];
+  blurPx:      number;
+  intervalSec: number;
+}) {
   // Use a transformed wrapper to create a new containing block so that the
   // fixed-positioned MediaBackground anchors to it instead of the viewport.
   return (
@@ -595,7 +650,7 @@ function PreviewBackground({ slides }: { slides: MediaSlide[] }) {
       transform: 'translateZ(0)',  // create containing block for fixed children
       overflow: 'hidden',
     }}>
-      <MediaBackground slides={slides} blurPx={20} overlayOpacity={0.55} intervalSec={5} />
+      <MediaBackground slides={slides} blurPx={blurPx} overlayOpacity={0.55} intervalSec={intervalSec} />
     </div>
   );
 }

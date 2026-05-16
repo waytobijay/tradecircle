@@ -59,6 +59,15 @@ export function useAuth(): UseAuthReturn {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
+    // Bootstrap guard: when Firebase isn't configured (e.g. fresh Vercel
+    // deploy without env vars) `auth` is null. Skip the subscription, mark
+    // loading=false, and let the user reach /setup or /login to configure.
+    if (!auth) {
+      setLoading(false);
+      setIsAdmin(false);
+      return;
+    }
+
     // Subscribe to Firebase Auth state changes.
     // The returned function unsubscribes on unmount.
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {

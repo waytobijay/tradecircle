@@ -243,7 +243,7 @@ function formatPrice(price: number, currency: string): string {
 
 function HeroSection() {
   const [hovered, setHovered] = useState(false);
-  const { slides } = useMediaBackground();
+  const { slides, blurPx, intervalSec } = useMediaBackground();
 
   return (
     <section
@@ -259,7 +259,7 @@ function HeroSection() {
       }}
     >
       {/* Cinematic blurred CMS-managed media background. */}
-      <MediaBackground slides={slides} blurPx={28} overlayOpacity={0.62} intervalSec={7} />
+      <MediaBackground slides={slides} blurPx={blurPx} overlayOpacity={0.62} intervalSec={intervalSec} />
 
       {/* Subtle floating mockup decorations (CSS only) — corners. */}
       <div aria-hidden="true" style={{

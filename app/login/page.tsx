@@ -251,7 +251,7 @@ function LoginForm() {
   const router        = useRouter();
   const searchParams  = useSearchParams();
   const nextPath      = searchParams.get('next');
-  const { slides }    = useMediaBackground();
+  const { slides, blurPx, intervalSec } = useMediaBackground();
 
   const [showPassword,  setShowPassword]  = useState(false);
   const [forgotOpen,    setForgotOpen]    = useState(false);
@@ -285,34 +285,63 @@ function LoginForm() {
   } = useForm<LoginFormData>({ resolver: zodResolver(loginSchema) });
 
   // ── Email/password submit ──────────────────
+  async function tryLocalAuth(email: string, password: string): Promise<boolean> {
+    const res = await fetch('/api/local-auth', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, password }),
+    });
+    const text = await res.text();
+    let payload: { ok?: boolean; error?: string; redirect?: string } = {};
+    try { payload = text ? JSON.parse(text) : {}; } catch { /* non-JSON */ }
+    if (payload.ok) {
+      router.replace(payload.redirect || '/admin/dashboard');
+      return true;
+    }
+    if (payload.error === 'invalid_credentials') {
+      setServerError('Invalid email or password.');
+      return true; // handled
+    }
+    return false; // no local admin / other error — caller should fall through
+  }
+
   async function onSubmit(data: LoginFormData) {
     setServerError('');
     try {
-      // Local-bootstrap path — used when Firebase isn't configured yet.
+      // Local-bootstrap path — used when Firebase isn't configured.
       if (localMode) {
-        const res = await fetch('/api/local-auth', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ email: data.email, password: data.password }),
-        });
-        const payload = await res.json();
-        if (!payload.ok) {
-          const msg =
-            payload.error === 'invalid_credentials' ? 'Invalid email or password.' :
-            payload.error === 'no_local_admin'      ? 'No local admin exists. Visit /setup first.' :
-            'Sign in failed. Please try again.';
-          setServerError(msg);
-          return;
-        }
-        router.replace(payload.redirect || '/admin/dashboard');
+        const handled = await tryLocalAuth(data.email, data.password);
+        if (!handled) setServerError('No local admin exists. Visit /setup first.');
         return;
       }
 
-      const { user } = await signInWithEmail(data.email, data.password);
-      const path = await resolveRedirectPath(user.uid, nextPath);
-      router.replace(path);
+      // Firebase path with local-admin fallback for bootstrap accounts
+      // that were created before Firebase was configured.
+      try {
+        const { user } = await signInWithEmail(data.email, data.password);
+        const path = await resolveRedirectPath(user.uid, nextPath);
+        router.replace(path);
+      } catch (firebaseErr) {
+        // If Firebase rejects (user not found / wrong password), try the
+        // local bootstrap admin before surfacing the error. This lets the
+        // first super-admin sign in even when their account hasn't been
+        // migrated to Firebase yet.
+        const handled = await tryLocalAuth(data.email, data.password);
+        if (!handled) {
+          throw firebaseErr; // fall through to outer catch with original Firebase error
+        }
+      }
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Sign in failed. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Sign in failed. Please try again.';
+      // Friendly Firebase error mapping
+      const friendly =
+        msg.includes('auth/user-not-found')      ? 'No account found with this email.' :
+        msg.includes('auth/wrong-password')      ? 'Incorrect password.' :
+        msg.includes('auth/invalid-credential')  ? 'Invalid email or password.' :
+        msg.includes('auth/too-many-requests')   ? 'Too many attempts. Try again later.' :
+        msg.includes('auth/network-request-failed') ? 'Network error. Check your connection.' :
+        msg;
+      setServerError(friendly);
     }
   }
 
@@ -334,7 +363,7 @@ function LoginForm() {
   return (
     <>
       {/* Blurred cinematic background */}
-      <MediaBackground slides={slides} blurPx={26} overlayOpacity={0.6} intervalSec={6} />
+      <MediaBackground slides={slides} blurPx={blurPx} overlayOpacity={0.6} intervalSec={intervalSec} />
 
       <main
         style={{

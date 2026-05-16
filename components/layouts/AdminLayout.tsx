@@ -22,7 +22,7 @@ import {
   ToggleLeft, Settings, BarChart2, Download, Database, HardDrive,
   ChevronLeft, ChevronRight, Menu, X, LogOut, User, Receipt, TrendingUp,
   AlertTriangle, UserCog, Key, Activity, Palette, CreditCard, Globe2, Gift,
-  Target, Plug,
+  Target, Plug, Images,
 } from 'lucide-react';
 import { auth }         from '@/services/firebase';
 import { useAuthStore } from '@/store/authStore';
@@ -60,6 +60,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/ads',              icon: <Megaphone       size={18} />, label: 'Ads'             },
   { href: '/admin/ai-settings',      icon: <Bot             size={18} />, label: 'AI Settings'     },
   { href: '/admin/cms',              icon: <FileText        size={18} />, label: 'CMS'             },
+  { href: '/admin/login-media',      icon: <Images          size={18} />, label: 'Login Media'     },
   { href: '/admin/feature-toggles',  icon: <ToggleLeft      size={18} />, label: 'Feature Toggles' },
   { href: '/admin/configuration',    icon: <Settings        size={18} />, label: 'Configuration'   },
   { href: '/admin/tax',              icon: <Receipt         size={18} />, label: 'Tax'             },
@@ -93,6 +94,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/ads':             'Ads',
   '/admin/ai-settings':     'AI Settings',
   '/admin/cms':             'CMS',
+  '/admin/login-media':     'Login Media',
   '/admin/feature-toggles': 'Feature Toggles',
   '/admin/configuration':   'Configuration',
   '/admin/tax':             'Tax',
