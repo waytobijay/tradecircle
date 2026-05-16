@@ -19,6 +19,7 @@ import { usePathname }         from 'next/navigation';
 import { doc, getDoc }         from 'firebase/firestore';
 import { Menu, X }             from 'lucide-react';
 import { db }                  from '@/services/firebase';
+import LanguageSelector        from '@/components/ui/LanguageSelector';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -28,6 +29,7 @@ const NAV_LINKS = [
   { href: '/',         label: 'Home'            },
   { href: '/search',   label: 'Browse Products' },
   { href: '/advisors', label: 'Advisors'        },
+  { href: '/blog',     label: 'Blog'            },
 ];
 
 export default function PublicLayout({ children }: PublicLayoutProps) {
@@ -142,7 +144,7 @@ export default function PublicLayout({ children }: PublicLayoutProps) {
         {/* Mobile slide-down drawer */}
         <div style={{
           overflow: 'hidden',
-          maxHeight: drawerOpen ? 340 : 0,
+          maxHeight: drawerOpen ? 388 : 0,
           transition: 'max-height 0.3s ease',
           background: 'var(--color-background)',
           borderTop: drawerOpen ? '1px solid var(--color-border)' : 'none',
@@ -176,6 +178,32 @@ export default function PublicLayout({ children }: PublicLayoutProps) {
 
       {/* Page content — offset for fixed navbar */}
       <main style={{ paddingTop: 64 }}>{children}</main>
+
+      {/* ── Footer ───────────────────────────────────────────────────────── */}
+      <footer style={{
+        borderTop:  '1px solid var(--color-border)',
+        background: 'var(--color-surface)',
+        padding:    '20px',
+      }}>
+        <div style={{
+          maxWidth:       1200,
+          margin:         '0 auto',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          flexWrap:       'wrap',
+          gap:            12,
+        }}>
+          <span style={{ fontSize: 13, color: 'var(--color-text-2)' }}>
+            © {new Date().getFullYear()} {companyName}
+          </span>
+          <LanguageSelector size="sm" variant="dropdown" />
+        </div>
+      </footer>
     </>
   );
 }
+
+
+
+export { PublicLayout };

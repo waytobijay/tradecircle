@@ -36,6 +36,16 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
+/**
+ * Force dynamic rendering for all routes.
+ * Reason: The app is fully Firebase-backed client-side (Auth + Firestore
+ * onSnapshot listeners). Static pre-rendering at build time tries to evaluate
+ * client modules and fails because the Firebase SDK requires window/browser
+ * APIs. Forcing dynamic = 'force-dynamic' here makes Vercel render every route
+ * on demand, which is the correct mode for a real-time data app.
+ */
+export const dynamic = 'force-dynamic';
+
 // ─────────────────────────────────────────────
 // Root layout
 // ─────────────────────────────────────────────

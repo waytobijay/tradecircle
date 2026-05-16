@@ -59,6 +59,7 @@ import { useAuthStore } from '@/store/authStore';
 import BuyerLayout from '@/components/layouts/BuyerLayout';
 import SkeletonLoader from '@/components/ui/SkeletonLoader';
 import FollowButton from '@/components/ui/FollowButton';
+import VerifiedBadge from '@/components/ui/VerifiedBadge';
 import type { User as UserType, AdvicePost } from '@/types';
 
 // ─────────────────────────────────────────────
@@ -909,8 +910,11 @@ export default function AdvisorProfilePage() {
 
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
                   <div>
-                    <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: 'var(--color-text)' }}>
+                    <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       {advisor.name}
+                      {advisor.verified && (
+                        <VerifiedBadge size="md" label="Verified Advisor" />
+                      )}
                     </h1>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       {advisor.specialty && (

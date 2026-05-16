@@ -21,7 +21,8 @@ import { collection, limit, onSnapshot, query, where } from 'firebase/firestore'
 import { signOut }                                   from 'firebase/auth';
 import {
   Bell, ShoppingCart, ChevronDown,
-  User, Package, Bookmark, Settings, LogOut,
+  User, Package, Bookmark, Settings, LogOut, Gift,
+  Video, Radio,
 } from 'lucide-react';
 import { db, auth }      from '@/services/firebase';
 import { useAuthStore }  from '@/store/authStore';
@@ -32,9 +33,11 @@ interface BuyerLayoutProps {
   children: React.ReactNode;
 }
 
-const NAV_LINKS = [
+const NAV_LINKS: { href: string; label: string; icon?: React.ReactNode }[] = [
   { href: '/home',      label: 'Home'      },
   { href: '/search',    label: 'Search'    },
+  { href: '/videos',    label: 'Videos',   icon: <Video size={14} /> },
+  { href: '/live',      label: 'Live',     icon: <Radio size={14} color="var(--color-danger)" /> },
   { href: '/advisors',  label: 'Advisors'  },
   { href: '/messages',  label: 'Messages'  },
 ];
@@ -119,7 +122,9 @@ export default function BuyerLayout({ children }: BuyerLayoutProps) {
                 fontWeight: pathname.startsWith(l.href) ? 600 : 400,
                 color: pathname.startsWith(l.href) ? 'var(--color-primary)' : 'var(--color-text)',
                 transition: 'color 0.15s',
+                display: 'inline-flex', alignItems: 'center', gap: 5,
               }}>
+                {l.icon}
                 {l.label}
               </Link>
             ))}
@@ -199,6 +204,8 @@ export default function BuyerLayout({ children }: BuyerLayoutProps) {
                     { href: `/profile/${uid}`, icon: <User size={15} />,     label: 'Profile'      },
                     { href: '/orders',         icon: <Package size={15} />,  label: 'Orders'       },
                     { href: '/saved',          icon: <Bookmark size={15} />, label: 'Saved Items'  },
+                    { href: '/rewards',        icon: <Gift size={15} />,     label: 'Rewards'      },
+                    { href: '/referrals',      icon: <Gift size={15} />,     label: 'Referrals'    },
                     { href: '/settings',       icon: <Settings size={15} />, label: 'Settings'     },
                   ].map((item) => (
                     <Link key={item.href} href={item.href} style={{
@@ -242,3 +249,7 @@ export default function BuyerLayout({ children }: BuyerLayoutProps) {
     </>
   );
 }
+
+
+
+export { BuyerLayout };

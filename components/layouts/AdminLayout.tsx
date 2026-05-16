@@ -19,8 +19,10 @@ import { signOut }                                   from 'firebase/auth';
 import {
   LayoutDashboard, Users, Shield, Package, BookOpen,
   MessageSquare, ShoppingBag, Megaphone, Bot, FileText,
-  ToggleLeft, Settings, BarChart2, Download, Database,
-  ChevronLeft, ChevronRight, Menu, X, LogOut, User,
+  ToggleLeft, Settings, BarChart2, Download, Database, HardDrive,
+  ChevronLeft, ChevronRight, Menu, X, LogOut, User, Receipt, TrendingUp,
+  AlertTriangle, UserCog, Key, Activity, Palette, CreditCard, Globe2, Gift,
+  Target, Plug,
 } from 'lucide-react';
 import { auth }         from '@/services/firebase';
 import { useAuthStore } from '@/store/authStore';
@@ -40,7 +42,17 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: '/admin/dashboard',        icon: <LayoutDashboard size={18} />, label: 'Dashboard'       },
   { href: '/admin/users',            icon: <Users           size={18} />, label: 'Users'           },
+  { href: '/admin/fraud',            icon: <AlertTriangle   size={18} />, label: 'Fraud Flags'     },
   { href: '/admin/admin-users',      icon: <Shield          size={18} />, label: 'Admin Users'     },
+  { href: '/admin/roles',            icon: <UserCog         size={18} />, label: 'Regional Roles'  },
+  { href: '/admin/api-keys',         icon: <Key             size={18} />, label: 'API Keys'        },
+  { href: '/admin/status',           icon: <Activity        size={18} />, label: 'System Status'   },
+  { href: '/admin/tenant-branding',  icon: <Palette         size={18} />, label: 'Tenant Branding' },
+  { href: '/admin/billing',          icon: <CreditCard      size={18} />, label: 'Operator Billing'},
+  { href: '/admin/loyalty',          icon: <Gift            size={18} />, label: 'Loyalty Program' },
+  { href: '/admin/campaigns',        icon: <Target          size={18} />, label: 'Ad Campaigns'    },
+  { href: '/admin/integrations',     icon: <Plug            size={18} />, label: 'Marketing SSO'   },
+  { href: '/admin/data-residency',   icon: <Globe2          size={18} />, label: 'Data Residency'  },
   { href: '/admin/products',         icon: <Package         size={18} />, label: 'Products'        },
   { href: '/admin/advisories',       icon: <BookOpen        size={18} />, label: 'Advisories'      },
   { href: '/admin/enquiries',        icon: <MessageSquare   size={18} />, label: 'Enquiries'       },
@@ -50,15 +62,30 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/cms',              icon: <FileText        size={18} />, label: 'CMS'             },
   { href: '/admin/feature-toggles',  icon: <ToggleLeft      size={18} />, label: 'Feature Toggles' },
   { href: '/admin/configuration',    icon: <Settings        size={18} />, label: 'Configuration'   },
+  { href: '/admin/tax',              icon: <Receipt         size={18} />, label: 'Tax'             },
   { href: '/admin/analytics',        icon: <BarChart2       size={18} />, label: 'Analytics'       },
+  { href: '/admin/analytics-integrations', icon: <TrendingUp size={18} />, label: 'Integrations'  },
   { href: '/admin/exports',          icon: <Download        size={18} />, label: 'Exports'         },
   { href: '/admin/backup',           icon: <Database        size={18} />, label: 'System Backup'   },
+  { href: '/admin/storage',          icon: <HardDrive       size={18} />, label: 'Storage'          },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
   '/admin/dashboard':       'Dashboard',
   '/admin/users':           'Users',
+  '/admin/fraud':           'Fraud Flags',
   '/admin/admin-users':     'Admin Users',
+  '/admin/roles':           'Regional Roles',
+  '/admin/api-keys':        'API Keys',
+  '/admin/status':          'System Status',
+  '/admin/tenant-branding': 'Tenant Branding',
+  '/admin/billing':         'Operator Billing',
+  '/admin/loyalty':         'Loyalty Program',
+  '/admin/campaigns':       'Ad Campaigns',
+  '/admin/integrations':    'Marketing SSO',
+  '/admin/data-residency':  'Data Residency',
+  '/admin/operators':       'Operators',
+  '/admin/geo-ads':         'Geo-Targeted Ads',
   '/admin/products':        'Products',
   '/admin/advisories':      'Advisories',
   '/admin/enquiries':       'Enquiries',
@@ -68,9 +95,12 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/cms':             'CMS',
   '/admin/feature-toggles': 'Feature Toggles',
   '/admin/configuration':   'Configuration',
-  '/admin/analytics':       'Analytics',
-  '/admin/exports':         'Exports',
+  '/admin/tax':             'Tax',
+  '/admin/analytics':                  'Analytics',
+  '/admin/analytics-integrations':     'Integrations',
+  '/admin/exports':                    'Exports',
   '/admin/backup':          'System Backup',
+  '/admin/storage':         'Storage',
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────

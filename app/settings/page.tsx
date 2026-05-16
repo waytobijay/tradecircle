@@ -14,7 +14,7 @@
 
 'use client';
 
-import { useEffect, useState }   from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter }             from 'next/navigation';
 import { useForm }               from 'react-hook-form';
 import { zodResolver }           from '@hookform/resolvers/zod';
@@ -34,6 +34,9 @@ import {
   Moon,
   Monitor,
   ChevronRight,
+  Phone,
+  X,
+  Languages,
 } from 'lucide-react';
 import {
   doc,
@@ -50,15 +53,18 @@ import {
 } from 'firebase/auth';
 import { auth, db }        from '@/services/firebase';
 import { useAuthStore }    from '@/store/authStore';
+import PhoneVerification   from '@/components/auth/PhoneVerification';
+import type { UserCredential } from 'firebase/auth';
 import { useUiStore }      from '@/store/uiStore';
 import type { Theme }      from '@/store/uiStore';
 import BuyerLayout         from '@/components/layouts/BuyerLayout';
 import SellerLayout        from '@/components/layouts/SellerLayout';
 import AdvisorLayout       from '@/components/layouts/AdvisorLayout';
+import LanguageSelector    from '@/components/ui/LanguageSelector';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Section = 'account' | 'privacy' | 'notifications' | 'location' | 'appearance' | 'danger';
+type Section = 'account' | 'privacy' | 'notifications' | 'location' | 'appearance' | 'language' | 'danger';
 
 interface NotifPrefs {
   pushNewMessage:     boolean;
@@ -219,14 +225,104 @@ function SaveButton({ loading, saved }: { loading: boolean; saved: boolean }) {
   );
 }
 
+// ─── Phone Verification Modal ─────────────────────────────────────────────────
+
+interface PhoneModalProps {
+  onClose: () => void;
+  onLinked: (phoneNumber: string) => void;
+}
+
+function PhoneModal({ onClose, onLinked }: PhoneModalProps) {
+  const [toast, setToast] = useState('');
+
+  async function handleVerified(credential: UserCredential) {
+    const phone = credential.user.phoneNumber ?? '';
+    onLinked(phone);
+    setToast('Phone number linked successfully!');
+    setTimeout(onClose, 1500);
+  }
+
+  return (
+    <div
+      style={{
+        position:        'fixed',
+        inset:           0,
+        zIndex:          50,
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        padding:         16,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="phone-modal-title"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        style={{
+          width:        '100%',
+          maxWidth:     420,
+          background:   'var(--color-surface)',
+          border:       '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-xl)',
+          padding:      'var(--space-6) var(--space-5)',
+          position:     'relative',
+        }}
+      >
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          style={{
+            position:  'absolute',
+            top:       12,
+            right:     12,
+            background: 'none',
+            border:    'none',
+            color:     'var(--color-text-2)',
+            cursor:    'pointer',
+            padding:   4,
+          }}
+          aria-label="Close"
+        >
+          <X size={18} />
+        </button>
+
+        {toast ? (
+          <div
+            style={{
+              textAlign:  'center',
+              padding:    'var(--space-6) 0',
+              color:      'var(--color-success, #10b981)',
+              fontWeight: 600,
+              fontSize:   'var(--text-base)',
+            }}
+          >
+            <Check size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
+            {toast}
+          </div>
+        ) : (
+          <PhoneVerification
+            mode="link"
+            onVerified={handleVerified}
+            onCancel={onClose}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Section: Account ─────────────────────────────────────────────────────────
 
 function AccountSection({ uid }: { uid: string }) {
   const setUser      = useAuthStore((s) => s.setUser);
   const user         = useAuthStore((s) => s.user);
-  const [saving, setSaving] = useState(false);
-  const [saved,  setSaved]  = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const [saved,  setSaved]        = useState(false);
   const [serverErr, setServerErr] = useState('');
+  const [phoneModalOpen, setPhoneModalOpen] = useState(false);
+  const [phoneToast, setPhoneToast]         = useState('');
 
   const { register, handleSubmit, formState: { errors } } = useForm<AccountForm>({
     resolver:     zodResolver(accountSchema),
@@ -269,27 +365,110 @@ function AccountSection({ uid }: { uid: string }) {
     }
   }
 
+  const handlePhoneLinked = useCallback(async (phoneNumber: string) => {
+    try {
+      await updateDoc(doc(db, 'users', uid), { phone: phoneNumber });
+      if (user) setUser({ ...user, phone: phoneNumber });
+      setPhoneToast('Phone number updated successfully!');
+      setTimeout(() => setPhoneToast(''), 3000);
+    } catch {
+      setPhoneToast('Phone linked but failed to save. Please refresh.');
+      setTimeout(() => setPhoneToast(''), 4000);
+    }
+  }, [uid, user, setUser]);
+
+  const currentPhone = user?.phone ?? '';
+
   return (
-    <SectionCard>
-      <SectionTitle icon={<User size={18} />} label="Account" />
-      <form onSubmit={handleSubmit(onSave)}>
-        <FieldGroup label="Full Name" error={errors.displayName?.message}>
-          <input {...register('displayName')} style={INPUT_STYLE} />
-        </FieldGroup>
-        <FieldGroup label="Email Address" error={errors.email?.message}>
-          <input {...register('email')} type="email" style={INPUT_STYLE} />
-        </FieldGroup>
-        <FieldGroup label="Phone Number" error={errors.phone?.message}>
-          <input {...register('phone')} type="tel" style={INPUT_STYLE} placeholder="+1 234 567 8900" />
-        </FieldGroup>
-        {serverErr && (
-          <p style={{ color: 'var(--color-error)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
-            {serverErr}
-          </p>
-        )}
-        <SaveButton loading={saving} saved={saved} />
-      </form>
-    </SectionCard>
+    <>
+      <SectionCard>
+        <SectionTitle icon={<User size={18} />} label="Account" />
+        <form onSubmit={handleSubmit(onSave)}>
+          <FieldGroup label="Full Name" error={errors.displayName?.message}>
+            <input {...register('displayName')} style={INPUT_STYLE} />
+          </FieldGroup>
+          <FieldGroup label="Email Address" error={errors.email?.message}>
+            <input {...register('email')} type="email" style={INPUT_STYLE} />
+          </FieldGroup>
+
+          {/* Phone Number row — verified via OTP */}
+          <div style={{ marginBottom: 'var(--space-4)' }}>
+            <label
+              style={{
+                display:      'block',
+                marginBottom: 'var(--space-1)',
+                fontSize:     'var(--text-sm)',
+                fontWeight:   600,
+                color:        'var(--color-text-2)',
+              }}
+            >
+              Phone Number
+            </label>
+            <div
+              style={{
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'space-between',
+                gap:            'var(--space-3)',
+                padding:        'var(--space-2) var(--space-3)',
+                background:     'var(--color-surface-2)',
+                border:         '1px solid var(--color-border)',
+                borderRadius:   'var(--radius-md)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <Phone size={15} style={{ color: 'var(--color-text-3, #9ca3af)', flexShrink: 0 }} />
+                <span
+                  style={{
+                    fontSize: 'var(--text-sm)',
+                    color:    currentPhone ? 'var(--color-text)' : 'var(--color-text-3, #9ca3af)',
+                  }}
+                >
+                  {currentPhone || 'Not set'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPhoneModalOpen(true)}
+                style={{
+                  padding:      'var(--space-1) var(--space-3)',
+                  background:   'var(--color-primary)',
+                  color:        '#fff',
+                  border:       'none',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize:     'var(--text-xs)',
+                  fontWeight:   600,
+                  cursor:       'pointer',
+                  whiteSpace:   'nowrap',
+                  flexShrink:   0,
+                }}
+              >
+                {currentPhone ? 'Update' : 'Add'}
+              </button>
+            </div>
+            {phoneToast && (
+              <p style={{ margin: '6px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-success, #10b981)' }}>
+                {phoneToast}
+              </p>
+            )}
+          </div>
+
+          {serverErr && (
+            <p style={{ color: 'var(--color-error)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
+              {serverErr}
+            </p>
+          )}
+          <SaveButton loading={saving} saved={saved} />
+        </form>
+      </SectionCard>
+
+      {phoneModalOpen && (
+        <PhoneModal
+          onClose={() => setPhoneModalOpen(false)}
+          onLinked={handlePhoneLinked}
+        />
+      )}
+    </>
   );
 }
 
@@ -742,6 +921,20 @@ function AppearanceSection() {
   );
 }
 
+// ─── Section: Language ────────────────────────────────────────────────────────
+
+function LanguageSection() {
+  return (
+    <SectionCard>
+      <SectionTitle icon={<Languages size={18} />} label="Display Language" />
+      <p style={{ margin: '0 0 var(--space-4)', color: 'var(--color-text-2)', fontSize: 'var(--text-sm)' }}>
+        Choose the language used throughout the platform. Changes apply immediately — no page reload needed.
+      </p>
+      <LanguageSelector variant="inline" />
+    </SectionCard>
+  );
+}
+
 // ─── Section: Danger Zone ─────────────────────────────────────────────────────
 
 function DangerZoneSection() {
@@ -872,6 +1065,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: 'notifications', label: 'Notifications',  icon: <Bell size={16} /> },
   { id: 'location',      label: 'Location',       icon: <MapPin size={16} /> },
   { id: 'appearance',    label: 'Appearance',     icon: <Palette size={16} /> },
+  { id: 'language',      label: 'Language',       icon: <Languages size={16} /> },
   { id: 'danger',        label: 'Danger Zone',    icon: <ShieldAlert size={16} /> },
 ];
 
@@ -984,6 +1178,7 @@ export default function SettingsPage() {
             {active === 'notifications' && <NotificationsSection uid={user.uid} />}
             {active === 'location'      && <LocationSection      uid={user.uid} />}
             {active === 'appearance'    && <AppearanceSection />}
+            {active === 'language'      && <LanguageSection />}
             {active === 'danger'        && <DangerZoneSection />}
           </div>
 

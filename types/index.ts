@@ -109,6 +109,7 @@ export interface User {
   brand?: string;
   /** Advisor-specific */
   specialty?: string;
+  verified?: boolean;
   createdAt: Timestamp;
   emailVerified: boolean;
   active: boolean;
@@ -358,6 +359,8 @@ export interface SiteConfig {
   auth: AuthConfig;
   forms: FormsConfig;
   theme: ThemeConfig;
+  tax: TaxConfig;
+  analytics: AnalyticsConfig;
 }
 
 // ─────────────────────────────────────────────
@@ -541,4 +544,342 @@ export interface ProfileStats {
   followingCount: number;
   productCount: number;   // sellers
   adviceCount: number;    // advisors
+}
+
+// ─────────────────────────────────────────────
+// sellerSubscriptions/{uid}
+// ─────────────────────────────────────────────
+export type SubscriptionTierId = 'free' | 'basic' | 'pro' | 'premium';
+
+export interface SubscriptionTier {
+  id: SubscriptionTierId;
+  name: string;
+  priceAud: number;       // monthly AUD price (0 for free)
+  maxListings: number;    // -1 for unlimited
+  featuredListings: number;
+  adCreditsMonthly: number;
+  analyticsAccess: boolean;
+  prioritySupport: boolean;
+  stripePriceId?: string; // Stripe Billing price ID
+}
+
+export interface SellerSubscription {
+  uid: string;
+  tier: SubscriptionTierId;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  currentPeriodEnd?: Timestamp;
+  cancelAtPeriodEnd: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ─────────────────────────────────────────────
+// Tax configuration (stored in config/siteConfig)
+// ─────────────────────────────────────────────
+export interface TaxRegion {
+  code: string;       // e.g. 'AU', 'NP', 'US'
+  name: string;       // e.g. 'Australia', 'Nepal'
+  taxName: string;    // e.g. 'GST', 'VAT', 'Sales Tax'
+  rate: number;       // percentage e.g. 10 for 10%
+  enabled: boolean;
+  applyToShipping: boolean;
+  inclusive: boolean; // price already includes tax
+}
+
+export interface TaxConfig {
+  enabled: boolean;
+  regions: TaxRegion[];
+  defaultRegionCode: string;
+}
+
+// ─────────────────────────────────────────────
+// Analytics configuration (stored in config/siteConfig)
+// ─────────────────────────────────────────────
+
+export interface AnalyticsConfig {
+  ga4MeasurementId?: string;
+  facebookPixelId?:  string;
+  enabled:           boolean;
+}
+
+// ─────────────────────────────────────────────
+// advisorSubscriptions/{uid}
+// ─────────────────────────────────────────────
+export type AdvisorPlanId = 'free' | 'professional' | 'expert';
+
+export interface AdvisorPlan {
+  id: AdvisorPlanId;
+  name: string;
+  priceAud: number;            // 0 for free
+  maxActivePosts: number;      // -1 for unlimited
+  featuredProfile: boolean;
+  directEnquiryPriority: boolean;
+  analyticsAccess: boolean;
+  verifiedBadge: boolean;
+  stripePriceId?: string;
+}
+
+export interface AdvisorSubscription {
+  uid: string;
+  plan: AdvisorPlanId;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  currentPeriodEnd?: Timestamp;
+  cancelAtPeriodEnd: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ─────────────────────────────────────────────
+// blogPosts/{postId}
+// ─────────────────────────────────────────────
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  content: string;       // HTML or markdown
+  excerpt: string;
+  coverImage?: string;   // Cloudinary URL
+  author: string;        // admin name
+  category: string;
+  tags: string[];
+  published: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  views: number;
+}
+
+// ─────────────────────────────────────────────
+// fraudFlags/{flagId}
+// ─────────────────────────────────────────────
+export type FraudSeverity = 'low' | 'medium' | 'high';
+export type FraudFlagStatus = 'open' | 'reviewed' | 'dismissed';
+
+export interface FraudFlag {
+  id: string;
+  targetType: 'product' | 'user' | 'order';
+  targetId: string;
+  targetName: string;
+  reason: string;          // AI-generated explanation
+  severity: FraudSeverity;
+  status: FraudFlagStatus;
+  detectedAt: Timestamp;
+  reviewedBy?: string;     // admin email
+  reviewedAt?: Timestamp;
+  notes?: string;
+}
+
+// ─────────────────────────────────────────────
+// Phase 4 — Multi-tenant
+// ─────────────────────────────────────────────
+export interface TenantConfig {
+  tenantId: string;
+  operatorName: string;
+  domain: string;
+  branding: BrandingConfig;
+  billingEmail: string;
+  plan: 'starter' | 'growth' | 'enterprise';
+  dataRegion: string;   // e.g. 'us-central1', 'asia-southeast1'
+  createdAt: Timestamp;
+  active: boolean;
+}
+
+// Phase 4 — Advanced role hierarchy
+export type RegionalRole = 'global-admin' | 'regional-admin' | 'country-admin' | 'city-moderator';
+export interface RegionalAdmin {
+  uid: string; name: string; email: string;
+  role: RegionalRole;
+  scope: { regions: string[]; countries: string[]; cities: string[] };  // scope of access
+  permissions: AdminPermissions;
+  createdAt: Timestamp; active: boolean;
+}
+
+// Phase 4 — API marketplace
+export type ApiKeyScope = 'read-products' | 'write-products' | 'read-orders' | 'read-users' | 'webhooks';
+export interface ApiKey {
+  id: string; name: string; ownerUid: string;
+  keyHash: string;                    // store hash only; show full key once on creation
+  prefix: string;                     // tc_live_XXXX (first 8 chars displayed)
+  scopes: ApiKeyScope[];
+  rateLimit: number;                  // requests per minute
+  lastUsedAt?: Timestamp;
+  usageCount: number;
+  createdAt: Timestamp; expiresAt?: Timestamp; revoked: boolean;
+}
+
+// Phase 4 — SLA monitoring
+export type ServiceStatus = 'operational' | 'degraded' | 'partial-outage' | 'major-outage';
+export interface ServiceHealth {
+  id: string; name: string;                     // e.g. 'API', 'Firestore', 'Auth', 'Storage'
+  status: ServiceStatus;
+  uptime30d: number;                            // percentage 0-100
+  avgResponseMs: number;
+  lastIncident?: Timestamp;
+  updatedAt: Timestamp;
+}
+export interface Incident {
+  id: string; title: string; description: string;
+  severity: 'minor' | 'major' | 'critical';
+  status: 'investigating' | 'identified' | 'monitoring' | 'resolved';
+  affectedServices: string[];
+  startedAt: Timestamp; resolvedAt?: Timestamp;
+  updates: { message: string; timestamp: Timestamp }[];
+}
+
+// Phase 4 — Operator billing
+export type OperatorPlanId = 'starter' | 'growth' | 'enterprise';
+export interface OperatorPlan {
+  id: OperatorPlanId;
+  name: string;
+  monthlyPriceAud: number;
+  maxUsers: number;          // -1 = unlimited
+  maxProducts: number;
+  maxStorageGb: number;
+  customDomain: boolean;
+  whiteLabel: boolean;
+  dedicatedSupport: boolean;
+  slaUptime: number;         // 99.0, 99.9, 99.99
+}
+export interface OperatorInvoice {
+  id: string; tenantId: string;
+  amount: number; currency: ProductCurrency;
+  status: 'paid' | 'pending' | 'overdue' | 'failed';
+  periodStart: Timestamp; periodEnd: Timestamp;
+  paidAt?: Timestamp;
+  downloadUrl?: string;
+  createdAt: Timestamp;
+}
+
+// Phase 4 — Data residency
+export type DataRegion = 'us-central1' | 'us-east1' | 'europe-west1' | 'asia-southeast1' | 'asia-south1' | 'australia-southeast1';
+export interface RegionInfo {
+  code: DataRegion;
+  name: string;             // e.g. 'Sydney, Australia'
+  flag: string;             // emoji
+  jurisdiction: string;     // 'AU', 'EU-GDPR', 'IN', etc.
+  latencyMs: number;        // typical ping from Sydney
+}
+
+// ─────────────────────────────────────────────
+// Phase 5 — Loyalty
+// ─────────────────────────────────────────────
+export type LoyaltyTier = 'bronze' | 'silver' | 'gold' | 'platinum';
+export type LoyaltyAction = 'purchase' | 'review' | 'referral' | 'signup' | 'first-order' | 'redemption';
+export interface LoyaltyAccount {
+  uid: string; tier: LoyaltyTier; points: number; lifetimePoints: number;
+  tierProgress: number;          // points until next tier
+  joinedAt: Timestamp; updatedAt: Timestamp;
+}
+export interface LoyaltyTransaction {
+  id: string; uid: string;
+  action: LoyaltyAction;
+  points: number;                // positive earned, negative redeemed
+  description: string;
+  orderId?: string; reviewId?: string; referralId?: string;
+  createdAt: Timestamp;
+}
+export interface LoyaltyReward {
+  id: string; name: string; description: string;
+  pointsCost: number;
+  type: 'discount' | 'free-shipping' | 'product' | 'badge';
+  value?: number;                // e.g. 10 for 10% discount
+  active: boolean;
+  imageUrl?: string;
+}
+
+// ─────────────────────────────────────────────
+// Phase 5 — Referrals
+// ─────────────────────────────────────────────
+export interface ReferralCode {
+  code: string;                  // 8-char unique
+  ownerUid: string; ownerName: string;
+  uses: number; maxUses?: number;
+  rewardPoints: number;          // points awarded to owner per referral
+  signupBonus: number;           // points awarded to new user
+  createdAt: Timestamp; expiresAt?: Timestamp; active: boolean;
+}
+export interface Referral {
+  id: string;
+  referrerUid: string; referredUid: string;
+  code: string;
+  status: 'pending' | 'qualified' | 'rewarded';
+  signupAt: Timestamp; firstOrderAt?: Timestamp; rewardedAt?: Timestamp;
+  pointsAwarded: number;
+}
+
+// ─────────────────────────────────────────────
+// Phase 5 — Advanced ad engine
+// ─────────────────────────────────────────────
+export type AdBiddingModel = 'cpm' | 'cpc' | 'cpa' | 'flat';
+export type AdAuctionResult = 'won' | 'lost' | 'budget-exceeded';
+
+export interface AdCampaign {
+  id: string; advertiserId: string; name: string;
+  budget: number; spentToDay: number; spentTotal: number;
+  bidAmount: number; biddingModel: AdBiddingModel;
+  startDate: Timestamp; endDate: Timestamp;
+  status: AdStatus;
+  // A/B testing
+  variants: AdVariant[];
+  activeVariantId?: string;
+  winningVariantId?: string;
+  createdAt: Timestamp;
+}
+export interface AdVariant {
+  id: string; name: string;            // 'A', 'B', 'C'
+  creative: AdCreative;
+  impressions: number; clicks: number; conversions: number;
+  spend: number;
+  trafficWeight: number;               // 0-100, distribution percentage
+}
+
+// ─────────────────────────────────────────────
+// Phase 5 — Marketing SSO integrations
+// ─────────────────────────────────────────────
+export type IntegrationProvider = 'mailchimp' | 'hubspot' | 'meta-business' | 'klaviyo' | 'sendgrid';
+export interface MarketingIntegration {
+  id: string;
+  provider: IntegrationProvider;
+  enabled: boolean;
+  apiKey?: string;          // stored hashed/encrypted in prod
+  accountId?: string;
+  listId?: string;          // mailchimp audience / hubspot list
+  syncContacts: boolean;
+  syncOrders: boolean;
+  lastSyncAt?: Timestamp;
+  status: 'connected' | 'disconnected' | 'error';
+  errorMessage?: string;
+}
+
+// Phase 5 — Video marketplace
+export interface ProductVideo {
+  id: string; sellerId: string; productId?: string;
+  title: string; description: string;
+  videoUrl: string;                  // Cloudinary or external
+  thumbnailUrl: string;
+  durationSec: number;
+  views: number; likes: number;
+  tags: string[];
+  createdAt: Timestamp; active: boolean;
+}
+
+// Phase 5 — Live streaming
+export type StreamStatus = 'scheduled' | 'live' | 'ended';
+export interface LiveStream {
+  id: string; sellerId: string; sellerName: string;
+  title: string; description: string;
+  productIds: string[];              // products featured in stream
+  thumbnailUrl: string;
+  streamUrl?: string;                // RTMP/HLS endpoint (placeholder)
+  scheduledFor: Timestamp;
+  startedAt?: Timestamp; endedAt?: Timestamp;
+  status: StreamStatus;
+  viewerCount: number; peakViewers: number;
+  createdAt: Timestamp;
+}
+export interface StreamChatMessage {
+  id: string; streamId: string;
+  senderUid: string; senderName: string;
+  text: string; createdAt: Timestamp;
 }

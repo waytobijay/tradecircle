@@ -52,6 +52,7 @@ import type { OrderStatus, PaymentGateway, ProductCurrency } from '@/types';
 import BuyerLayout       from '@/components/layouts/BuyerLayout';
 import SellerLayout      from '@/components/layouts/SellerLayout';
 import AdvisorLayout     from '@/components/layouts/AdvisorLayout';
+import InvoiceButton     from '@/components/orders/InvoiceButton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -834,33 +835,36 @@ export default function OrdersPage() {
 
                         {/* Actions */}
                         <td style={{ padding: 'var(--space-4)' }}>
-                          <button
-                            onClick={() => setSelectedOrder(order)}
-                            style={{
-                              padding:      'var(--space-1) var(--space-3)',
-                              background:   'var(--color-surface)',
-                              border:       '1px solid var(--color-border)',
-                              borderRadius: 'var(--radius-md)',
-                              color:        'var(--color-text)',
-                              fontSize:     'var(--text-xs)',
-                              fontWeight:   600,
-                              cursor:       'pointer',
-                              whiteSpace:   'nowrap',
-                              transition:   'border-color 0.15s, color 0.15s',
-                            }}
-                            onMouseEnter={(e) => {
-                              const b = e.currentTarget as HTMLButtonElement;
-                              b.style.borderColor = 'var(--color-primary)';
-                              b.style.color       = 'var(--color-primary)';
-                            }}
-                            onMouseLeave={(e) => {
-                              const b = e.currentTarget as HTMLButtonElement;
-                              b.style.borderColor = 'var(--color-border)';
-                              b.style.color       = 'var(--color-text)';
-                            }}
-                          >
-                            View Details
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => setSelectedOrder(order)}
+                              style={{
+                                padding:      'var(--space-1) var(--space-3)',
+                                background:   'var(--color-surface)',
+                                border:       '1px solid var(--color-border)',
+                                borderRadius: 'var(--radius-md)',
+                                color:        'var(--color-text)',
+                                fontSize:     'var(--text-xs)',
+                                fontWeight:   600,
+                                cursor:       'pointer',
+                                whiteSpace:   'nowrap',
+                                transition:   'border-color 0.15s, color 0.15s',
+                              }}
+                              onMouseEnter={(e) => {
+                                const b = e.currentTarget as HTMLButtonElement;
+                                b.style.borderColor = 'var(--color-primary)';
+                                b.style.color       = 'var(--color-primary)';
+                              }}
+                              onMouseLeave={(e) => {
+                                const b = e.currentTarget as HTMLButtonElement;
+                                b.style.borderColor = 'var(--color-border)';
+                                b.style.color       = 'var(--color-text)';
+                              }}
+                            >
+                              View Details
+                            </button>
+                            <InvoiceButton orderId={order.id} order={order as import('@/types').Order} />
+                          </div>
                         </td>
                       </tr>
                     );

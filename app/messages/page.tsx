@@ -76,11 +76,12 @@ import {
   Loader2,
   MessageSquare,
 } from 'lucide-react';
-import { db }           from '@/services/firebase';
-import { useAuthStore } from '@/store/authStore';
-import BuyerLayout      from '@/components/layouts/BuyerLayout';
-import SellerLayout     from '@/components/layouts/SellerLayout';
-import AdvisorLayout    from '@/components/layouts/AdvisorLayout';
+import { db }              from '@/services/firebase';
+import { useAuthStore }    from '@/store/authStore';
+import BuyerLayout         from '@/components/layouts/BuyerLayout';
+import SellerLayout        from '@/components/layouts/SellerLayout';
+import AdvisorLayout       from '@/components/layouts/AdvisorLayout';
+import { ReplyAssistant }  from '@/components/ai/ReplyAssistant';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -981,6 +982,28 @@ function MessagesInner() {
                   onRemove={(i) => setImageFiles((prev) => prev.filter((_, idx) => idx !== i))}
                 />
               )}
+
+              {/* AI Reply Assistant — shown to sellers and advisors only */}
+              {activeConvId && (user?.role === 'seller' || user?.role === 'advisor') && (() => {
+                // Find the last message from the other participant
+                const lastFromOther = [...messages].reverse().find((m) => m.senderId !== myUid);
+                const lastContext   = lastFromOther?.text ?? '';
+                return lastContext ? (
+                  <div
+                    style={{
+                      padding:    '0 var(--space-4) var(--space-2)',
+                      background: 'var(--color-surface)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ReplyAssistant
+                      context={lastContext}
+                      role={user.role as 'seller' | 'advisor'}
+                      onSelect={(reply) => setText(reply)}
+                    />
+                  </div>
+                ) : null;
+              })()}
 
               {/* Input bar */}
               <div

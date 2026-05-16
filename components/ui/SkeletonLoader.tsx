@@ -98,3 +98,5 @@ export function SkeletonAvatar(props: Omit<SkeletonLoaderProps, 'variant'>) {
 export function SkeletonImage(props: Omit<SkeletonLoaderProps, 'variant'>) {
   return <SkeletonLoader variant="image" {...props} />;
 }
+
+export default SkeletonLoader;

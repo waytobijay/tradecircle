@@ -54,6 +54,8 @@ import {
 import { db } from '@/services/firebase';
 import { useAuthStore } from '@/store/authStore';
 import type { Product, AdvicePost } from '@/types';
+import { AdCard } from '@/components/home/AdCard';
+import { useAds } from '@/hooks/useAds';
 
 // ─────────────────────────────────────────────
 // Types
@@ -656,6 +658,7 @@ export function HomeFeed() {
 
   const { items, loading, loadingMore, hasMore, loadMore, refresh } = useFeed(filter);
   const newCount = useNewPostCount(filter, loadedAt);
+  const { ads } = useAds();
 
   // Infinite scroll sentinel
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -756,13 +759,22 @@ export function HomeFeed() {
                   </p>
                 </div>
               ) : (
-                items.map((item) =>
-                  item.type === 'product' ? (
+                items.map((item, index) => {
+                  const feedCard = item.type === 'product' ? (
                     <ProductFeedCard key={item.id} item={item} />
                   ) : (
                     <AdviceFeedCard key={item.id} item={item} />
-                  )
-                )
+                  );
+
+                  // After every 8th item (1-based), inject an ad
+                  if (ads.length > 0 && (index + 1) % 8 === 0) {
+                    const adIndex = Math.floor((index + 1) / 8) - 1;
+                    const ad = ads[adIndex % ads.length];
+                    return [feedCard, <AdCard key={`ad-${index}`} ad={ad} />];
+                  }
+
+                  return feedCard;
+                })
               )}
 
               {/* Infinite scroll sentinel */}

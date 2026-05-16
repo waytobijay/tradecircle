@@ -8,6 +8,7 @@ import type { GatewaysConfig, ProductCurrency } from '@/types';
 import { initiateStripe } from './stripe';
 import { initiateEsewa } from './esewa';
 import { initiateKhalti } from './khalti';
+import { initiateEway } from './eway';
 
 export type GatewayId =
   | 'stripe'
@@ -87,12 +88,15 @@ export async function initiatePayment(params: PaymentInitiateParams): Promise<vo
     }
 
     case 'eway': {
-      // eWAY requires a server-side token exchange; a full integration would
-      // POST to an internal API route that returns a redirect URL.
-      // Placeholder: direct the merchant to configure via the admin panel.
-      throw new Error(
-        'eWAY payments require a server-side integration. Please contact the platform administrator.',
-      );
+      if (!returnUrl || !cancelUrl) throw new Error('eWAY requires returnUrl and cancelUrl.');
+      await initiateEway({
+        amount,
+        currency,
+        orderId: orderId ?? `TC-${Date.now()}`,
+        returnUrl,
+        cancelUrl,
+      });
+      break;
     }
 
     case 'contact-seller':

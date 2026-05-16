@@ -13,6 +13,19 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/store/uiStore';
+import { useFCM } from '@/hooks/useFCM';
+import { useAuthStore } from '@/store/authStore';
+
+// ─────────────────────────────────────────────
+// FCMRegistrar — mounts only when authenticated
+// Registers the FCM push token and subscribes
+// to foreground messages. Renders nothing.
+// ─────────────────────────────────────────────
+
+function FCMRegistrar() {
+  useFCM();
+  return null;
+}
 
 // ─────────────────────────────────────────────
 // Inner component — must be a child of the
@@ -22,6 +35,9 @@ import { useUIStore } from '@/store/uiStore';
 function AuthBootstrap({ children }: { children: React.ReactNode }) {
   // Starts onAuthStateChanged listener → writes to authStore
   useAuth();
+
+  // Only activate FCM once the user is confirmed signed-in
+  const uid = useAuthStore((s) => s.user?.uid ?? null);
 
   // Apply saved theme on first mount (SSR renders without data-theme;
   // this runs before first paint on the client)
@@ -33,7 +49,13 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally once — uiStore.toggleTheme calls applyTheme internally
 
-  return <>{children}</>;
+  return (
+    <>
+      {/* Register FCM push token once the user is signed in */}
+      {uid && <FCMRegistrar />}
+      {children}
+    </>
+  );
 }
 
 // ─────────────────────────────────────────────

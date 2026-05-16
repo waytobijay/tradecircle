@@ -11,13 +11,13 @@
 
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Phone } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { signInWithEmail, signInWithGoogle, sendPasswordReset } from '@/services/auth';
 import { db } from '@/services/firebase';
@@ -278,6 +278,21 @@ function LoginForm() {
   const [forgotOpen, setForgotOpen]       = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [serverError, setServerError]     = useState('');
+  const [setupNeeded, setSetupNeeded]     = useState(false);
+
+  // Probe whether first-time admin setup is still pending.
+  // Hides the bootstrap link once the first super-admin has been created.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/setup-check', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { setupComplete?: boolean } | null) => {
+        if (cancelled || !data) return;
+        if (data.setupComplete === false) setSetupNeeded(true);
+      })
+      .catch(() => { /* silent — link just stays hidden */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const {
     register,
@@ -505,6 +520,31 @@ function LoginForm() {
               </button>
             </form>
 
+            {/* Divider — phone */}
+            <div className="flex items-center gap-sm mt-md mb-sm">
+              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-border)' }} />
+              <span className="text-xs font-medium px-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                or
+              </span>
+              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-border)' }} />
+            </div>
+
+            {/* Continue with Phone */}
+            <Link
+              href="/login/phone"
+              className="w-full flex items-center justify-center gap-sm py-xs rounded-md text-sm font-medium transition-opacity hover:opacity-80"
+              style={{
+                border:          '1.5px solid var(--color-border)',
+                backgroundColor: 'var(--color-bg-primary)',
+                color:           'var(--color-text-primary)',
+                padding:         '10px',
+                textDecoration:  'none',
+              }}
+            >
+              <Phone size={18} />
+              Continue with Phone
+            </Link>
+
             {/* Sign up link */}
             <p
               className="mt-lg text-sm text-center"
@@ -519,6 +559,22 @@ function LoginForm() {
                 Sign Up
               </Link>
             </p>
+
+            {/* First-time setup bootstrap — only visible when no super-admin exists */}
+            {setupNeeded && (
+              <p
+                className="mt-xs text-center"
+                style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}
+              >
+                <Link
+                  href="/setup"
+                  className="transition-opacity hover:opacity-70"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  First time setup? →
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </main>

@@ -7,9 +7,10 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import {
-  Eye, Users, UserPlus, Package, ShoppingBag, TrendingUp,
+  Eye, Users, UserPlus, Package, ShoppingBag, TrendingUp, ArrowRight,
 } from 'lucide-react';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
@@ -173,6 +174,41 @@ export default function AdminAnalyticsPage() {
             Platform-wide metrics and performance overview
           </p>
         </div>
+
+        {/* Advanced Analytics link card */}
+        <Link href="/admin/analytics/cohort" style={{ textDecoration: 'none', display: 'block', marginBottom: 24 }}>
+          <div style={{
+            background: 'linear-gradient(135deg, var(--color-primary) 0%, #764ba2 100%)',
+            borderRadius: 12, padding: '20px 24px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+            cursor: 'pointer',
+            transition: 'opacity 0.15s',
+          }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.opacity = '0.92'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; }}
+          >
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>
+                New
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
+                Advanced Analytics
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
+                Cohort retention, revenue by gateway, and user growth charts
+              </div>
+            </div>
+            <div style={{
+              width: 40, height: 40, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.18)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, marginLeft: 16,
+            }}>
+              <ArrowRight size={20} color="#fff" />
+            </div>
+          </div>
+        </Link>
 
         {/* Date range tabs */}
         <div style={{

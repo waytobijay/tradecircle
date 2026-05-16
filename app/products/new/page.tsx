@@ -48,6 +48,8 @@ import { db }           from '@/services/firebase';
 import { useAuthStore } from '@/store/authStore';
 import { RoleGuard }    from '@/components/guards/RoleGuard';
 import { SellerLayout } from '@/components/layouts/SellerLayout';
+import { ProductDescriptionGenerator } from '@/components/ai/ProductDescriptionGenerator';
+import { ImageTagger }  from '@/components/ai/ImageTagger';
 import type { ProductCurrency, ProductCondition } from '@/types';
 
 // ─────────────────────────────────────────────
@@ -594,6 +596,19 @@ function NewProductForm() {
   const useProfileLoc  = watch('city') === (user?.location?.city ?? '') &&
                          watch('country') === (user?.location?.country ?? '');
 
+  // First uploaded image URL (for AI auto-tagging)
+  const firstImageUrl  = images.find((img) => img.cloudinaryUrl)?.cloudinaryUrl ?? '';
+
+  function handleTagsGenerated(result: { category: string; tags: string[]; description: string }) {
+    if (result.category) {
+      setValue('category', result.category, { shouldValidate: true });
+    }
+    // Tags field is not in the current schema; apply description if the description field is empty
+    if (result.description && !description) {
+      setValue('description', result.description, { shouldValidate: true });
+    }
+  }
+
   const inputStyle: React.CSSProperties = {
     width:           '100%',
     padding:         '10px 12px',
@@ -745,13 +760,21 @@ function NewProductForm() {
         {/* ── Section 2: Description ── */}
         <div style={{ borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', padding: 'var(--space-lg)', backgroundColor: 'var(--color-bg-primary)' }}>
           <SectionHeader number={2} title="Description" />
-          <Field label="Product Description" required error={errors.description?.message}>
-            <DescriptionEditor
-              value={description}
-              onChange={(v) => setValue('description', v, { shouldValidate: true })}
-              error={errors.description?.message}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+            <ProductDescriptionGenerator
+              productName={watch('name') ?? ''}
+              category={watch('category') ?? ''}
+              condition={watch('condition') ?? ''}
+              onGenerated={(desc) => setValue('description', desc, { shouldValidate: true })}
             />
-          </Field>
+            <Field label="Product Description" required error={errors.description?.message}>
+              <DescriptionEditor
+                value={description}
+                onChange={(v) => setValue('description', v, { shouldValidate: true })}
+                error={errors.description?.message}
+              />
+            </Field>
+          </div>
         </div>
 
         {/* ── Section 3: Photos ── */}
@@ -761,6 +784,12 @@ function NewProductForm() {
             images={images}
             onChange={(imgs) => setImages(typeof imgs === 'function' ? (imgs as (prev: ImageEntry[]) => ImageEntry[])(images) : imgs)}
           />
+          <div style={{ marginTop: 'var(--space-sm)' }}>
+            <ImageTagger
+              imageUrl={firstImageUrl}
+              onTagsGenerated={handleTagsGenerated}
+            />
+          </div>
         </div>
 
         {/* ── Section 4: Pricing ── */}

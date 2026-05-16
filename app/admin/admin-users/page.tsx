@@ -17,11 +17,12 @@ import {
   collection, getDocs, addDoc, updateDoc, deleteDoc,
   doc, serverTimestamp,
 } from 'firebase/firestore';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import {
-  Plus, Pencil, Trash2, X, Eye, EyeOff, Check, Minus,
+  Plus, Pencil, Trash2, X, Eye, EyeOff, Check, Minus, KeyRound,
 } from 'lucide-react';
 import AdminLayout from '@/components/layouts/AdminLayout';
-import { db }     from '@/services/firebase';
+import { db, auth } from '@/services/firebase';
 import type { AdminUser, AdminRole, AdminPermissions } from '@/types';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -453,6 +454,7 @@ export default function AdminUsersPage() {
   const [editTarget,    setEditTarget]    = useState<AdminUser | null>(null);
   const [deleteTarget,  setDeleteTarget]  = useState<AdminUser | null>(null);
   const [error,         setError]         = useState('');
+  const [resetStatus,   setResetStatus]   = useState<{ id: string; state: 'sending' | 'sent' } | null>(null);
 
   // ── Fetch ────────────────────────────────────────────────────────────────
   const fetchAdminUsers = useCallback(async () => {
@@ -481,6 +483,26 @@ export default function AdminUsersPage() {
       );
     } catch {
       setError('Failed to update admin user status.');
+    }
+  }
+
+  async function handleSendPasswordReset(adminUser: AdminUser) {
+    setResetStatus({ id: adminUser.id, state: 'sending' });
+    try {
+      await sendPasswordResetEmail(auth, adminUser.email);
+      setResetStatus({ id: adminUser.id, state: 'sent' });
+      // Clear the inline confirmation after a few seconds.
+      setTimeout(() => {
+        setResetStatus((curr) => (curr?.id === adminUser.id ? null : curr));
+      }, 4000);
+    } catch (err) {
+      console.error('[admin-users] sendPasswordResetEmail failed:', err);
+      setResetStatus(null);
+      setError(
+        err instanceof Error
+          ? `Failed to send reset email: ${err.message}`
+          : 'Failed to send reset email.',
+      );
     }
   }
 
@@ -680,6 +702,27 @@ export default function AdminUsersPage() {
                             title="Edit"
                           >
                             <Pencil size={12} /> Edit
+                          </button>
+                          <button
+                            onClick={() => void handleSendPasswordReset(au)}
+                            disabled={resetStatus?.id === au.id && resetStatus.state === 'sending'}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 5,
+                              padding: '5px 11px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+                              border: '1px solid var(--color-border)', background: 'none',
+                              cursor: resetStatus?.id === au.id && resetStatus.state === 'sending' ? 'not-allowed' : 'pointer',
+                              color: resetStatus?.id === au.id && resetStatus.state === 'sent'
+                                ? 'var(--color-success)'
+                                : 'var(--color-text-secondary)',
+                            }}
+                            title="Send password reset email"
+                          >
+                            <KeyRound size={12} />
+                            {resetStatus?.id === au.id && resetStatus.state === 'sending'
+                              ? 'Sending…'
+                              : resetStatus?.id === au.id && resetStatus.state === 'sent'
+                                ? 'Reset sent'
+                                : 'Send Reset'}
                           </button>
                           <button
                             onClick={() => void handleToggleActive(au)}

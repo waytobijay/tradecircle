@@ -212,3 +212,7 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
     </>
   );
 }
+
+
+
+export { SellerLayout };

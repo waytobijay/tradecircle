@@ -10,10 +10,11 @@
 'use client';
 
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Mail, Loader2, CheckCircle } from 'lucide-react';
 import { sendVerificationEmail } from '@/services/auth';
+import { auth } from '@/services/firebase';
 
 // ─────────────────────────────────────────────
 // Constants
@@ -27,12 +28,35 @@ const COOLDOWN_SECONDS = 60;
 
 function VerifyContent() {
   const searchParams = useSearchParams();
+  const router       = useRouter();
   const email        = searchParams.get('email') ?? '';
 
   const [countdown, setCountdown]   = useState(0);
   const [resendState, setResendState] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Auto-poll for email verification ───────
+  useEffect(() => {
+    pollRef.current = setInterval(async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+        await currentUser.reload();
+        if (currentUser.emailVerified) {
+          clearInterval(pollRef.current!);
+          router.replace('/home');
+        }
+      } catch {
+        // ignore transient errors — keep polling
+      }
+    }, 3000);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [router]);
 
   // ── Countdown timer ────────────────────────
   useEffect(() => {

@@ -45,6 +45,7 @@ const PUBLIC_EXACT: ReadonlySet<string> = new Set([
   '/',
   '/login',
   '/signup',
+  '/setup',
   '/about',
   '/contact',
   '/faq',

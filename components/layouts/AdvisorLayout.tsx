@@ -208,3 +208,7 @@ export default function AdvisorLayout({ children }: AdvisorLayoutProps) {
     </>
   );
 }
+
+
+
+export { AdvisorLayout };

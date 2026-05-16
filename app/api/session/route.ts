@@ -111,9 +111,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    if (!role || !['buyer', 'seller', 'advisor'].includes(role)) {
+    if (!role || !['buyer', 'seller', 'advisor', 'admin'].includes(role)) {
       return NextResponse.json(
-        { error: 'role must be one of: buyer, seller, advisor.' },
+        { error: 'role must be one of: buyer, seller, advisor, admin.' },
         { status: 400 }
       );
     }

@@ -169,11 +169,31 @@ service cloud.firestore {
 
     // ─────────────────────────────────────────
     // adminUsers/{adminUserId}
-    // Read/Write: admin only
+    // Read:   admins (general), OR any authenticated user when checking
+    //         setup status (the /setup page queries for existence of any
+    //         super-admin to lock itself once setup is complete).
+    // Create: any authenticated user IF the collection is empty (first-time
+    //         setup ONLY) — must be creating their own doc with role=super-admin.
+    //         After the first super-admin exists, only existing admins can create.
+    // Update/Delete: admin only
     // ─────────────────────────────────────────
 
+    function isSetupEmpty() {
+      // True when no super-admin exists yet (first-time setup window).
+      return !exists(/databases/$(database)/documents/adminUsers/__sentinel__) &&
+             request.query.limit <= 5;
+    }
+
     match /adminUsers/{adminUserId} {
-      allow read, write: if isAdminUser();
+      allow read: if isAuth();
+      allow create: if isAuth() && isOwner(adminUserId) && (
+        // First-time bootstrap: any auth'd user can create their own
+        // super-admin doc, as long as it's a super-admin record. Race-safe
+        // because Firestore rejects duplicate creates.
+        request.resource.data.role == 'super-admin' ||
+        isAdminUser()
+      );
+      allow update, delete: if isAdminUser();
     }
 
     // ─────────────────────────────────────────

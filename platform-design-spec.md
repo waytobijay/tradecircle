@@ -1895,25 +1895,106 @@ These rules apply to:
 | 2026-05-15 | Session 2 | Search page (spec 6.1) built with infinite scroll, debounced search, URL-synced filters |
 | 2026-05-16 | Session 3 | Full parallel build — all admin pages, all public pages, all services/utils, HomeFeed, messages. Auto-accept permissions configured. |
 | 2026-05-16 | Session 4 | Session API route, all 5 hooks, Firestore rules, notificationStore, cartStore localStorage persist, useAuth session-cookie patch, LandingPage verified complete, utils/image.ts, spec tracker updated. Phase 1 MVP is functionally complete. |
+| 2026-05-16 | Session 5 | Phase 2 complete — reviews/ratings, social follows, reusable components (ImageUploader, StepBuilder, GatewayCard), cookies page, FCM push notifications, eWAY server route, seller subscriptions, ads in feed (AdCard + useAds), tax config admin page, OTP/Phone Auth, Supabase + S3 storage adapters, advisor premium plans, VerifiedBadge, backup Phase 2 (file upload restore + mode selector), advisor analytics |
+| 2026-05-16 | Session 6 | Phase 3 complete — AI features (description gen, reply assistant, fraud detection, image tagging), invoice PDF, GA4/Facebook Pixel integrations, multi-language i18n (EN/NE/HI), public blog + blog post pages, advanced cohort analytics, advisor analytics, Backup Phase 3 (cloud storage + scheduling + history + retention), VerifiedBadge, advisor subscription plans |
+| 2026-05-16 | Session 7 | Phase 4 complete — RegionalAdmin role hierarchy, API marketplace (SHA-256 hashed keys + docs page), SLA uptime monitoring (90-day grid + incident reporting), tenant white-label branding (logo/theme/custom domain/email), operator billing dashboard, data residency (6 regions), geo-targeted ads, operators page |
+| 2026-05-16 | Session 8 | Phase 5 complete — Loyalty program (tiers/points/rewards) + Referrals, TikTok-style video marketplace + Live streaming (chat + featured products + floating hearts), AI ad creative generator + A/B testing campaigns (CPM/CPC/CPA bidding), Marketing SSO integrations (Mailchimp/HubSpot/Meta Conversions API/Klaviyo/SendGrid) |
 
 ---
 
 ### 13.12 Remaining Work (Phase 2+)
 
-| Item | Priority | Notes |
-|------|----------|-------|
-| `services/payments/eway.ts` | Phase 2 | Requires server-side API route + eWAY token exchange |
-| `/cookies` page | Phase 2 | Cookie policy page |
-| Firebase Functions | Phase 2 | Server-side payment processing, scheduled backups, rate limiting |
-| Push notifications (FCM) | Phase 2 | Firebase Cloud Messaging setup |
-| `ImageUploader.tsx` component | Phase 2 | Drag-drop multi-image with progress, wraps services/cloudinary.ts |
-| `StepBuilder.tsx` component | Phase 2 | Reusable step editor for advice posts |
-| `GatewayCard.tsx` component | Phase 2 | Reusable payment method card |
-| OTP / SMS verification | Phase 3 | Firebase Phone Auth |
-| Multi-language support | Phase 3 | i18n — English, Nepali, Hindi |
-| Native mobile apps | Phase 3 | React Native |
+| Item | Status | Notes |
+|------|--------|-------|
+| `services/payments/eway.ts` | ✅ | Server-side API route + client service done |
+| `/cookies` page | ✅ | Cookie policy page complete |
+| Firebase Functions | ✅ | Server-side payment processing, scheduled backups, rate limiting |
+| Push notifications (FCM) | ✅ | Firebase Cloud Messaging setup complete |
+| `ImageUploader.tsx` component | ✅ | Drag-drop multi-image with progress, wraps services/cloudinary.ts |
+| `StepBuilder.tsx` component | ✅ | Reusable step editor for advice posts |
+| `GatewayCard.tsx` component | ✅ | Reusable payment method card |
+| Reviews / ratings | ✅ | Full reviews and ratings system |
+| Social follows | ✅ | Follow/unfollow users |
+| Seller subscriptions | ✅ | Subscription plans for sellers |
+| Ads in feed (AdCard + useAds) | ✅ | Sponsored listings in feed |
+| Tax config admin page | ✅ | Admin-configurable tax settings |
+| OTP / Phone Auth | ✅ | Firebase Phone Auth with OTP verification |
+| Supabase + S3 storage adapters | ✅ | Pluggable storage backends |
+| Advisor premium plans | ✅ | Premium tier for advisors |
+| VerifiedBadge | ✅ | Verified user/seller badge component |
+| Backup Phase 2 (file upload restore + mode selector) | ✅ | File upload restore and backup mode selector |
+| Advisor analytics | ✅ | Analytics dashboard for advisors |
 
 ---
 
-*End of Specification — TradeCircle Platform v1.3*
+### 13.13 Phase 3 Progress
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| AI — product description generator | ✅ | OpenAI API via admin-configured key |
+| AI — advisor answer assistant | ✅ | Draft reply from AI in enquiries |
+| AI — fraud detection | ✅ | Admin flagging of unusual patterns |
+| AI — image auto-tagging | ✅ | Categorise product images |
+| AI — chat reply suggestions | ✅ | Draft suggestions in messages |
+| Advanced analytics (cohort, retention) | ✅ | |
+| Blog / Content section | ✅ | CMS-managed articles (admin CMS page exists) |
+| SSO marketing tools | ✅ | GA4 + Facebook Pixel done |
+| Multi-language i18n | ✅ | English, Nepali, Hindi |
+| Invoice PDF generation | ✅ | Per-order downloadable invoice |
+| Backup Phase 3 (scheduled, cloud) | ✅ | Cloud Scheduler + Storage |
+| Native mobile apps | ❌ | Phase 3 — React Native |
+
+---
+
+### 13.14 Phase 4 Progress
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Multi-tenant architecture | ✅ | TenantConfig type + operators admin page |
+| Per-tenant custom domain + branding | ✅ | /admin/tenant-branding (logo, theme, custom domain CNAME, email branding) |
+| Operator billing dashboard | ✅ | /admin/billing (3 plans, usage bars, invoice history) |
+| Advanced role hierarchy | ✅ | /admin/roles with RegionalAdmin (global/regional/country/city) |
+| Data residency options | ✅ | /admin/data-residency (6 Firebase regions) |
+| API marketplace access | ✅ | /admin/api-keys (SHA-256 hashed) + /admin/api-keys/docs |
+| Location-based ad geo-targeting | ✅ | /admin/geo-ads + services/geo.ts (haversine + clustering) |
+| SLA uptime monitoring | ✅ | /admin/status (90-day uptime grid + incident reporting) |
+
+---
+
+### 13.15 Phase 5 Progress
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Live streaming sales | ✅ | /live, /live/[id] (chat + featured products), /live/schedule — needs external RTMP provider (Mux/Cloudflare Stream) |
+| Video marketplace | ✅ | /videos (TikTok-style snap scroll + IntersectionObserver autoplay), /videos/upload (Cloudinary video + canvas thumbnail) |
+| AI-generated ad creatives | ✅ | services/aiAdCreative.ts (generates headline/body/CTA + 3 A/B variants) |
+| Loyalty rewards system | ✅ | /rewards (tiers + redemption), /admin/loyalty, services/loyalty.ts (atomic Firestore transaction) |
+| Affiliate / referral program | ✅ | /referrals (8-char code + share buttons + qualified tracking) |
+| SSO integration (Mailchimp, HubSpot, Meta Business) | ✅ | /admin/integrations + services/marketingSync.ts (5 providers, per-provider try/catch) |
+| Advanced ad engine (CPM/CPC bidding, A/B testing) | ✅ | /admin/campaigns + /admin/campaigns/[id] (variants + statistical significance + auto-optimize) |
+
+---
+
+### 13.16 Final Status (Sessions 1–8)
+
+**All 5 phases functionally complete.** The platform now spans:
+- **Phase 1 MVP**: All 50+ pages, auth, marketplace, messaging, admin portal, public site
+- **Phase 2 Growth**: Reviews, follows, FCM push, OTP, subscriptions, ads, tax, storage adapters, advisor plans
+- **Phase 3 Intelligence**: AI (description gen, fraud detection, image tagging, reply assistant), i18n, blog, invoices, GA4/Pixel, cohort analytics, scheduled backups
+- **Phase 4 Enterprise**: Multi-tenant, white-label branding, custom domains, regional roles, API marketplace, data residency, SLA dashboard, geo-ads
+- **Phase 5 Ecosystem**: Live streams, video feed, loyalty + referrals, ad engine (A/B), AI ad creatives, marketing SSO
+
+**Production prerequisites still needed:**
+- Real Firebase project + env vars (NEXT_PUBLIC_FIREBASE_*)
+- `npm install firebase-admin @supabase/supabase-js @aws-sdk/s3-request-presigner` for server-side payment/restore/S3
+- Live payment gateway credentials (Stripe secret keys, eWAY API key + password)
+- External RTMP provider for live streaming (Mux/Cloudflare Stream/Agora/AWS IVS)
+- Cloudinary video upload preset enabled
+- VAPID key for FCM web push
+- AI provider API key (OpenAI/OpenRouter) configured in admin AI Settings
+- Native mobile apps (Phase 3 item) — separate React Native project
+
+---
+
+*End of Specification — TradeCircle Platform v1.5*
 *This document is a living specification. Update version number and date on each revision.*

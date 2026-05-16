@@ -88,6 +88,12 @@ interface UiActions {
    */
   setTheme: (theme: Theme) => void;
 
+  /**
+   * Apply theme — alias for setTheme. Sets the data-theme attr + localStorage
+   * + store value in one call. Used by AuthProvider on user-doc load.
+   */
+  applyTheme: (theme: Theme) => void;
+
   /** Open or close the sidebar. */
   setSidebar: (open: boolean) => void;
 
@@ -117,7 +123,15 @@ export const useUiStore = create<UiState & UiActions>((set, get) => ({
     set({ theme });
   },
 
+  applyTheme: (theme) => {
+    applyTheme(theme);
+    set({ theme });
+  },
+
   setSidebar: (open) => set({ sidebarOpen: open }),
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
 }));
+
+// Alias for compatibility — both casings are used across the codebase
+export const useUIStore = useUiStore;
