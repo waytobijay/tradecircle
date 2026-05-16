@@ -14,6 +14,10 @@
    Spec ref: sections 8.1, 8.2, 8.7, 8.8
    ------------------------------------------------------------ */
 
+/* Main Tailwind import MUST be before any @source or other rules
+   (CSS @import statements must precede non-@import rules) */
+@import "tailwindcss";
+
 /* --- Content source paths (all project folders) --- */
 @source "../app/**/*.{ts,tsx,js,jsx}";
 @source "../components/**/*.{ts,tsx,js,jsx}";
@@ -26,8 +30,6 @@
 @source "../seller/**/*.{ts,tsx,js,jsx}";
 @source "../advisor/**/*.{ts,tsx,js,jsx}";
 @source "../buyer/**/*.{ts,tsx,js,jsx}";
-
-@import "tailwindcss";
 
 /* --- @theme inline: colour + font tokens ---
    @theme inline tells Tailwind to generate utilities that output var() references
