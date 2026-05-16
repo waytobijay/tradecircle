@@ -61,17 +61,35 @@ async function resolveRedirectPath(uid: string, next: string | null): Promise<st
     return next;
   }
 
-  const adminSnap = await getDoc(doc(db, 'adminUsers', uid));
-  if (adminSnap.exists() && adminSnap.data()?.active === true) {
-    return '/admin/dashboard';
+  // Wrap reads in try/catch — if Firestore Security Rules block the read
+  // we surface a helpful error instead of a cryptic "Missing or insufficient
+  // permissions". This happens when firestore.rules hasn't been deployed.
+  try {
+    const adminSnap = await getDoc(doc(db, 'adminUsers', uid));
+    if (adminSnap.exists() && adminSnap.data()?.active === true) {
+      return '/admin/dashboard';
+    }
+  } catch (err) {
+    const msg = (err as Error).message || '';
+    if (msg.includes('insufficient') || msg.includes('PERMISSION_DENIED')) {
+      throw new Error(
+        'Firestore Security Rules are blocking access. ' +
+        'Open Firebase Console → Firestore → Rules and paste the contents of firestore.rules, then Publish.',
+      );
+    }
+    throw err;
   }
 
-  const userSnap = await getDoc(doc(db, 'users', uid));
-  if (userSnap.exists()) {
-    const role = userSnap.data()?.role as UserRole;
-    if (role === 'buyer' || role === 'seller' || role === 'advisor') {
-      return '/home';
+  try {
+    const userSnap = await getDoc(doc(db, 'users', uid));
+    if (userSnap.exists()) {
+      const role = userSnap.data()?.role as UserRole;
+      if (role === 'buyer' || role === 'seller' || role === 'advisor') {
+        return '/home';
+      }
     }
+  } catch {
+    // Non-fatal — fall through to default /home
   }
 
   return '/home';
