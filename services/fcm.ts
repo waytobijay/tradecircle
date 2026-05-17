@@ -17,6 +17,23 @@ import { app } from '@/services/firebase';
 // VAPID public key — set NEXT_PUBLIC_FIREBASE_VAPID_KEY in .env.local
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY ?? '';
 
+/**
+ * True only when FCM can safely be initialised. Requires:
+ *   - the firebase app object (not a null stub)
+ *   - the messaging sender ID (Firebase throws if missing)
+ *
+ * When false, FCM helpers no-op gracefully instead of crashing the page.
+ */
+function isFcmReady(): boolean {
+  return (
+    !!app &&
+    typeof (app as { options?: { messagingSenderId?: string } }).options
+      ?.messagingSenderId === 'string' &&
+    (app as { options: { messagingSenderId: string } }).options
+      .messagingSenderId.length > 0
+  );
+}
+
 // ─────────────────────────────────────────────
 // requestFCMToken
 // ─────────────────────────────────────────────
@@ -32,6 +49,13 @@ const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY ?? '';
  */
 export async function requestFCMToken(): Promise<string | null> {
   if (typeof window === 'undefined' || !('Notification' in window)) return null;
+  // Defensive: skip FCM entirely when messagingSenderId isn't configured.
+  // Without this, getMessaging() throws "messaging/missing-app-config-values"
+  // and crashes any caller (which crashes the React tree).
+  if (!isFcmReady()) {
+    console.warn('[fcm] Skipping — NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID not set');
+    return null;
+  }
 
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return null;
@@ -61,6 +85,9 @@ export async function requestFCMToken(): Promise<string | null> {
 export function onForegroundMessage(
   handler: (payload: MessagePayload) => void
 ): () => void {
+  // No-op when FCM isn't configured — prevents getMessaging() from throwing
+  // and crashing the React tree.
+  if (!isFcmReady()) return () => { /* nothing to unsubscribe */ };
   const messaging = getMessaging(app);
   return onMessage(messaging, handler);
 }
