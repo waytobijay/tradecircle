@@ -29,11 +29,17 @@ import { getStorage, FirebaseStorage }                 from 'firebase/storage';
 // (Local-config values are pulled into env at deploy time by the wizard.)
 // ─────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey:        process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  projectId:     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  authDomain:    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  appId:         process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  storageBucket:     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  // messagingSenderId is REQUIRED by firebase/messaging (FCM). Without it,
+  // getMessaging() throws "messaging/missing-app-config-values" and crashes
+  // any page that mounts FCMRegistrar (or imports the messaging module).
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  // measurementId is optional — only used when Analytics is enabled.
+  measurementId:     process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 } as const;
 
 export const isFirebaseConfigured: boolean =
