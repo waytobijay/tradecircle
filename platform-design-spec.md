@@ -2044,5 +2044,75 @@ These rules apply to:
 
 ---
 
-*End of Specification — TradeCircle Platform v1.5*
+### 13.20 Session 11 — Vercel deployment troubleshooting (2026-05-17)
+
+Production URL: **https://tradecircle-five.vercel.app**
+Firebase project: **tradecircle-ceda8**
+
+#### What was fixed this session
+
+| Issue | Commit | Notes |
+|-------|--------|-------|
+| `/following` prerender ReferenceError on Vercel | a97617e | Server wrapper with `dynamic = 'force-dynamic'`, client moved to `Client.tsx` |
+| `/setup` ENOENT on Vercel (read-only fs) | 2cd9cb2 | Hybrid setup: local file for dev / Firebase Admin SDK for Vercel |
+| `5 NOT_FOUND` raw gRPC error during /setup | 2cd9cb2 | Friendly mapping: "Firestore database doesn't exist — create one in console" |
+| `CONFIGURATION_NOT_FOUND` / `PERMISSION_DENIED` | 2cd9cb2 | Friendly mapping to console-action instructions |
+| Login: "Missing or insufficient permissions" | de4415d | Try/catch wrapped around Firestore reads with actionable message |
+| Firestore rules incomplete (Phase 2–5 missing, getUserRole crashed for admins) | 9103016 | Comprehensive rewrite — null-safe role lookup, all 30+ collections covered |
+| Docs out of date | a9736d2 | DEPLOYMENT.md expanded, ADMIN_GUIDE.md extended, 26-page PDF regenerated |
+| Login redirect loop after sign-in | a6ee140 | `/api/session` requires `{idToken, role, isAdmin}` — was only sending `{idToken}` |
+| Admin login bounced to /login | a6ee140 | Admins have no `users/{uid}` doc — synthesize one from `adminUsers/{uid}` |
+| Browser's generic "Page couldn't load" hid real errors | b947281 | `app/global-error.tsx` shows actual error message + digest + reset button |
+| `messaging/missing-app-config-values` crash on all pages | b507fe2 | `services/firebase.ts` was missing `messagingSenderId` + `measurementId` |
+| FCM crash takes down whole React tree | a26bb12 | `services/fcm.ts` now no-ops gracefully if messagingSenderId is missing |
+| `/api/health` too coarse to diagnose missing env vars | a26bb12 | Now reports per-env-var presence + `missing[]` array + Vercel env name |
+
+#### Open issues for next session
+
+1. **`NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` confirmed NOT in deployed Vercel bundle**
+   - Searched all login-page chunks for the value `799026091704` → 0 hits
+   - Either: not set on Vercel, only set for Preview env (not Production), OR added after last build
+   - **Fix:** Vercel → Settings → Environment Variables → verify `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` exists with all 3 environments checked → **Redeploy** with cache disabled
+   - Verify via: `GET /api/health` → `missing` array should be empty
+
+2. **Firestore rules need to be deployed manually**
+   - File: `firestore.rules` (latest comprehensive version pushed in commit `9103016`)
+   - Method: Firebase Console → Firestore → Rules → paste contents → Publish
+   - URL: https://console.firebase.google.com/project/tradecircle-ceda8/firestore/rules
+   - Without this, every authenticated read fails with "Missing or insufficient permissions"
+
+3. **Admin password unknown**
+   - User created admin via /setup with `waytobijay@gmail.com`
+   - Forgot the password; reset email may be going to spam (Firebase noreply domain)
+   - **Fix:** Firebase Console → Authentication → Users → find row → ⋯ → Delete user
+   - Also delete the matching doc in Firestore `adminUsers` collection
+   - Re-run `/setup` with a memorable password
+
+#### Vercel deployment status (as of this checkpoint)
+
+- Last commit deployed: `a26bb12`
+- Build: ✅ passes (82 routes, mostly static)
+- `/api/health`: ✅ returns `firebase: true, firebaseAdmin: true, cloudinary: true` (coarse — detailed version live after `a26bb12` deploys)
+- `/api/setup-check`: ✅ returns `setupComplete: false, firebaseConfigured: true`
+- `/login`: serves HTML but client JS errored due to FCM crash (fixed in `a26bb12` — needs Vercel to redeploy)
+- `/setup`: ready to use once messagingSenderId env var is set and rules deployed
+
+#### Resume checklist for next session
+
+```
+□ Wait for Vercel to deploy commit a26bb12 (defensive FCM + detailed /api/health)
+□ Visit https://tradecircle-five.vercel.app/api/health
+   - Verify "missing" array is empty
+   - If NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID listed → add it on Vercel + redeploy
+□ Deploy Firestore Rules (paste firestore.rules → Firebase Console → Publish)
+□ Delete existing admin from Firebase Console (Auth + Firestore /adminUsers)
+□ Visit /setup → create fresh admin with memorable password
+□ Log in → confirm redirects to /admin/dashboard cleanly (no flicker, no error)
+□ Test buyer/seller/advisor signup flows
+□ Address remaining items in §13.18 known issues
+```
+
+---
+
+*End of Specification — TradeCircle Platform v1.6*
 *This document is a living specification. Update version number and date on each revision.*
