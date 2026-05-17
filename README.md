@@ -29,8 +29,10 @@ Open http://localhost:3000 and navigate to `/setup` to create your master admin 
 
 | Document | Audience | What's inside |
 |---|---|---|
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | DevOps / developers | End-to-end deploy guide: Firebase + Cloudinary + Vercel + custom domain + troubleshooting. |
-| [ADMIN_GUIDE.md](./ADMIN_GUIDE.md) | Operators / admins | How to use the admin panel: user management, permissions, common workflows, maintenance. |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | DevOps / developers | End-to-end deploy guide: Firebase + Cloudinary + Vercel, bootstrap admin, `/api/health`, custom domain, full troubleshooting + errors cookbook. |
+| [ADMIN_GUIDE.md](./ADMIN_GUIDE.md) | Operators / admins | How to use the admin panel: user CRUD, bootstrap admin flow, Firebase Setup Wizard, login media, health diagnostics, common workflows. |
+| [TradeCircle-Documentation.pdf](./TradeCircle-Documentation.pdf) | All audiences | Combined PDF of DEPLOYMENT + ADMIN_GUIDE with cover page, TOC, and page numbers. |
+| [platform-design-spec.md](./platform-design-spec.md) | Architects / product | Full project specification: modules, data model, design tokens, feature catalogue. |
 | [.env.example](./.env.example) | Developers | Annotated list of every environment variable the app reads. |
 
 ---
