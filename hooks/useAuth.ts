@@ -83,53 +83,75 @@ export function useAuth(): UseAuthReturn {
         return;
       }
 
-      // Signed in — resolve full Firestore user document
+      // Signed in — resolve user identity (could be regular user OR admin)
       setLoading(true);
 
       try {
-        // 1. Fetch the Firestore user document
-        const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
+        // 1. Resolve role first (in parallel) so we can mint the session cookie.
+        //    Admins live in adminUsers/{uid} and may NOT have a users/{uid} doc.
+        const [adminSnap, userSnap] = await Promise.all([
+          getDoc(doc(db, 'adminUsers', firebaseUser.uid)),
+          getDoc(doc(db, 'users',      firebaseUser.uid)),
+        ]);
+
+        const isAdminUser = adminSnap.exists() && adminSnap.data()?.active === true;
+        setIsAdmin(isAdminUser);
+
+        // 2. Set the session cookie with the resolved role + admin flag.
+        //    /api/session validates role ∈ {buyer, seller, advisor, admin}.
+        //    Without this the middleware bounces the user back to /login.
+        try {
+          const idToken = await firebaseUser.getIdToken();
+          const resolvedRole =
+            isAdminUser
+              ? 'admin'
+              : (userSnap.exists() ? userSnap.data().role : 'buyer');
+          await fetch('/api/session', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              idToken,
+              role:    resolvedRole,
+              isAdmin: isAdminUser,
+            }),
+          });
+        } catch (sessionErr) {
+          console.warn('[useAuth] Failed to set session cookie:', sessionErr);
+        }
 
         if (userSnap.exists()) {
+          // Regular user — populate full user doc into authStore
           const userData = { uid: firebaseUser.uid, ...userSnap.data() } as User;
           setUser(userData);
 
-          // 2. Sync saved theme preference to uiStore / DOM
-          //    Spec ref: section 8.6 (authenticated users override OS preference)
+          // Sync saved theme
           const savedTheme = userSnap.data().theme as Theme | undefined;
           if (savedTheme === 'light' || savedTheme === 'dark') {
             setTheme(savedTheme);
           }
-
-          // 3. POST the Firebase ID token to /api/session to set an HttpOnly
-          //    session cookie for SSR-protected routes (admin middleware, etc.).
-          //    Spec ref: section 4.1 (Authentication Flows)
-          try {
-            const idToken = await firebaseUser.getIdToken();
-            await fetch('/api/session', {
-              method:  'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body:    JSON.stringify({ idToken }),
-            });
-          } catch (sessionErr) {
-            // Non-fatal: SSR guards will redirect to /login, client-side auth still works.
-            console.warn('[useAuth] Failed to set session cookie:', sessionErr);
-          }
+        } else if (isAdminUser) {
+          // Admin without a users/{uid} doc — synthesise a minimal user record
+          // so authStore.user is non-null and downstream guards don't redirect.
+          const adminData = adminSnap.data() ?? {};
+          setUser({
+            uid:           firebaseUser.uid,
+            email:         firebaseUser.email ?? adminData.email ?? '',
+            name:          firebaseUser.displayName ?? adminData.name ?? 'Admin',
+            role:          'admin',           // not in UserRole but tolerated
+            createdAt:     adminData.createdAt ?? null,
+            emailVerified: firebaseUser.emailVerified,
+            active:        true,
+          } as unknown as User);
         } else {
-          // Auth account exists but no Firestore doc yet
-          // (can happen during Google sign-up race condition)
-          clearAuth();
+          // Auth account exists but no user OR admin doc — race condition
+          // during fresh signup. Don't clear — let the signup flow finish
+          // writing the doc. Mark loading=false so UI can show something.
+          console.warn('[useAuth] No users/{uid} or adminUsers/{uid} doc found for', firebaseUser.uid);
         }
-
-        // 3. Check adminUsers collection for admin access
-        //    Spec ref: section 6.7 (admin portal protection)
-        const adminSnap = await getDoc(
-          doc(db, 'adminUsers', firebaseUser.uid)
-        );
-        setIsAdmin(adminSnap.exists() && adminSnap.data()?.active === true);
       } catch (error) {
         console.error('[useAuth] Failed to resolve user session:', error);
-        clearAuth();
+        // Don't clearAuth on Firestore errors — could be a transient rules issue.
+        // Better to let the user see SOMETHING than bounce them to /login forever.
         setIsAdmin(false);
       } finally {
         setLoading(false);
